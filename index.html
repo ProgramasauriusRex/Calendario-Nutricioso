@@ -63,7 +63,7 @@
       padding: 10px 14px;
       font-size: 11px;
       color: var(--amber-text);
-      display: flex;
+      display: none;
       justify-content: space-between;
       align-items: center;
       gap: 8px;
@@ -193,7 +193,7 @@
       <p>2 Adultos (80/60 kg) + Niño 2a · Dieta Rías Baixas</p>
     </header>
 
-    <div id="r15-banner" style="display:none;">
+    <div id="r15-banner">
       <span><strong>Aviso R15 (26 Nov):</strong> Lectura dudosa en el menú escolar.</span>
       <button onclick="navTo('guarderia')">Confirmar</button>
     </div>
@@ -222,13 +222,12 @@
   </div>
 
   <script>
-    // 1. Manejo seguro de LocalStorage para evitar pantallas en blanco en móviles
-    const KEY = 'NUTRIFAMI_R_BAIXAS_2026';
-    let DB = null;
-    let currentTab = 'mes';
-    let selectedDate = '2026-11-04';
+    var KEY = 'NUTRIFAMI_R_BAIXAS_2026';
+    var DB = null;
+    var currentTab = 'mes';
+    var selectedDate = '2026-11-04';
 
-    const GUARDERIA_NOV = [
+    var GUARDERIA_NOV = [
       { fecha: "2026-11-02", primero: "Crema de puerros y patata", segundo: "Pollo guisado con arroz", postre: "Manzana asada", grupo: "ave_conejo", ing: "pollo", hidrato: "arroz", nitratos: false, ok: true },
       { fecha: "2026-11-03", primero: "Crema de calabacín", segundo: "Merluza al horno con patata", postre: "Pera", grupo: "pescado_blanco", ing: "merluza", hidrato: "patata", nitratos: false, ok: true },
       { fecha: "2026-11-04", primero: "Crema de espinacas", segundo: "Lentejas estofadas con verduras", postre: "Mandarina", grupo: "legumbre", ing: "lenteja", hidrato: "legumbre", nitratos: true, ok: true },
@@ -252,7 +251,7 @@
       { fecha: "2026-11-30", primero: "Brócoli con zanahoria", segundo: "Garbanzos con espinacas", postre: "Mandarina", grupo: "legumbre", ing: "garbanzo", hidrato: "legumbre", nitratos: true, ok: true }
     ];
 
-    const RECETAS_CASA = [
+    var RECETAS_CASA = [
       { id: "PBL-01", nombre: "Merluza de pincho con cachelos y grelos", grupo: "pescado_blanco", ing: "merluza", hidrato: "patata", p80: 36, p60: 27, pNino: 8.8, icon: "🐟", ninoText: "Lomos 100% desespinados en lascas finas con patata chafada." },
       { id: "LEG-01", nombre: "Lentejas pardinas con calabaza y arroz integral", grupo: "legumbre", ing: "lenteja", hidrato: "legumbre", p80: 35, p60: 27, pNino: 8.5, icon: "🫘", ninoText: "Lentejas chafadas con tenedor; sin sal añadida." },
       { id: "AVE-03", nombre: "Albóndigas de pavo y calabacín con cuscús", grupo: "ave_conejo", ing: "pavo", hidrato: "pasta", p80: 37, p60: 28, pNino: 8.9, icon: "🍗", ninoText: "Albóndigas muy tiernas aplastadas en caldo suave." },
@@ -270,17 +269,19 @@
 
     function init() {
       try {
-        const stored = localStorage.getItem(KEY);
+        var stored = localStorage.getItem(KEY);
         if (stored) DB = JSON.parse(stored);
       } catch(e) { console.warn("Modo local sin almacenamiento persistente:", e); }
 
       if (!DB) {
-        // Generar 30 días de noviembre de 2026
-        const plan = [];
-        for (let d = 1; d <= 30; d++) {
-          const dateStr = `2026-11-${String(d).padStart(2, '0')}`;
-          const gDay = GUARDERIA_NOV.find(g => g.fecha === dateStr);
-          const rIndex = (d - 1) % RECETAS_CASA.length;
+        var plan = [];
+        for (var d = 1; d <= 30; d++) {
+          var dateStr = "2026-11-" + (d < 10 ? "0" + d : d);
+          var gDay = null;
+          for (var i = 0; i < GUARDERIA_NOV.length; i++) {
+            if (GUARDERIA_NOV[i].fecha === dateStr) { gDay = GUARDERIA_NOV[i]; break; }
+          }
+          var rIndex = (d - 1) % RECETAS_CASA.length;
           plan.push({
             fecha: dateStr,
             tipo: gDay ? 'guarderia' : 'casa',
@@ -290,7 +291,7 @@
             confirmado: gDay ? gDay.ok : true
           });
         }
-        DB = { plan, guarderia: GUARDERIA_NOV, checked: {} };
+        DB = { plan: plan, guarderia: GUARDERIA_NOV, checked: {} };
         save();
       }
       render();
@@ -298,21 +299,34 @@
 
     function save() {
       try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch(e){}
-      const pendingR15 = DB.plan.some(d => d.gDay && !d.confirmado);
-      document.getElementById('r15-banner').style.display = pendingR15 ? 'flex' : 'none';
+      var pendingR15 = false;
+      for (var i = 0; i < DB.plan.length; i++) {
+        if (DB.plan[i].gDay && !DB.plan[i].confirmado) {
+          pendingR15 = true;
+          break;
+        }
+      }
+      var banner = document.getElementById('r15-banner');
+      if (banner) {
+        banner.style.display = pendingR15 ? 'flex' : 'none';
+      }
     }
 
     function navTo(tab) {
       currentTab = tab;
-      document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-      const activeBtn = document.getElementById(`nav-${tab}`);
+      var buttons = document.querySelectorAll('nav button');
+      for (var i = 0; i < buttons.length; i++) {
+        buttons[i].classList.remove('active');
+      }
+      var activeBtn = document.getElementById('nav-' + tab);
       if (activeBtn) activeBtn.classList.add('active');
       render();
       window.scrollTo(0,0);
     }
 
     function render() {
-      const main = document.getElementById('main-view');
+      var main = document.getElementById('main-view');
+      if (!main) return;
       if (currentTab === 'mes') renderMes(main);
       else if (currentTab === 'dia') renderDia(main);
       else if (currentTab === 'balance') renderBalance(main);
@@ -322,39 +336,36 @@
       else if (currentTab === 'ajustes') renderAjustes(main);
     }
 
-    // 2. Vistas de la aplicación
     function renderMes(el) {
-      let html = `
-        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <div style="font-weight:800; font-size:14px;">Noviembre 2026</div>
-            <div style="font-size:11px; color:var(--text-muted);">Pontevedra · Semilla v1</div>
-          </div>
-          <button onclick="regenerarMes()" class="btn btn-outline" style="padding:6px 12px; font-size:11px;">↻ Reordenar</button>
-        </div>
-        <div class="card">
-          <div class="grid-7 day-header">
-            <div>L</div><div>M</div><div>X</div><div>J</div><div>V</div><div>S</div><div style="color:var(--primary);">D</div>
-          </div>
-          <div class="grid-7">
-            ${Array(6).fill('<div style="height:68px; opacity:0.2;"></div>').join('')}
-      `;
-      DB.plan.forEach(d => {
-        const dNum = parseInt(d.fecha.split('-')[2]);
-        const isSel = d.fecha === selectedDate;
-        const isWarn = d.gDay && !d.confirmado;
-        html += `
-          <div class="day-cell ${isSel ? 'selected' : ''} ${isWarn ? 'warning' : ''}" onclick="selectDate('${d.fecha}')">
-            <div style="display:flex; justify-content:space-between;">
-              <span class="num">${dNum}</span>
-              <span style="font-size:8px;">${d.tipo === 'guarderia' ? '🏫' : '🏠'}</span>
-            </div>
-            <div class="icon">${d.receta.icon}</div>
-            <div class="label">${d.receta.ing}</div>
-          </div>
-        `;
-      });
-      html += `</div></div>`;
+      var html = '<div class="card" style="display:flex; justify-content:space-between; align-items:center;">' +
+        '<div>' +
+          '<div style="font-weight:800; font-size:14px;">Noviembre 2026</div>' +
+          '<div style="font-size:11px; color:var(--text-muted);">Pontevedra · Semilla v1</div>' +
+        '</div>' +
+        '<button onclick="regenerarMes()" class="btn btn-outline" style="padding:6px 12px; font-size:11px;">↻ Reordenar</button>' +
+      '</div>' +
+      '<div class="card">' +
+        '<div class="grid-7 day-header">' +
+          '<div>L</div><div>M</div><div>X</div><div>J</div><div>V</div><div>S</div><div style="color:var(--primary);">D</div>' +
+        '</div>' +
+        '<div class="grid-7">' +
+          '<div style="height:68px; opacity:0.2;"></div>'.repeat(6);
+
+      for (var i = 0; i < DB.plan.length; i++) {
+        var d = DB.plan[i];
+        var dNum = parseInt(d.fecha.split('-')[2]);
+        var isSel = d.fecha === selectedDate;
+        var isWarn = d.gDay && !d.confirmado;
+        html += '<div class="day-cell ' + (isSel ? 'selected ' : '') + (isWarn ? 'warning' : '') + '" onclick="selectDate('' + d.fecha + '')">' +
+          '<div style="display:flex; justify-content:space-between;">' +
+            '<span class="num">' + dNum + '</span>' +
+            '<span style="font-size:8px;">' + (d.tipo === 'guarderia' ? '🏫' : '🏠') + '</span>' +
+          '</div>' +
+          '<div class="icon">' + d.receta.icon + '</div>' +
+          '<div class="label">' + d.receta.ing + '</div>' +
+        '</div>';
+      }
+      html += '</div></div>';
       el.innerHTML = html;
     }
 
@@ -364,71 +375,74 @@
     }
 
     function renderDia(el) {
-      const d = DB.plan.find(p => p.fecha === selectedDate) || DB.plan[0];
-      const r = d.receta;
-      let html = `
-        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-          <button class="btn btn-outline" style="padding:4px 10px;" onclick="changeDay(-1)">← Ant</button>
-          <div style="text-align:center;">
-            <div style="font-weight:800; font-size:14px;">${d.fecha}</div>
-            <div style="font-size:11px; color:var(--text-muted);">${d.tipo === 'guarderia' ? 'Día de guardería (cena niño)' : 'Comida familiar en casa'}</div>
-          </div>
-          <button class="btn btn-outline" style="padding:4px 10px;" onclick="changeDay(1)">Sig →</button>
-        </div>
-      `;
+      var d = DB.plan[0];
+      for (var i = 0; i < DB.plan.length; i++) {
+        if (DB.plan[i].fecha === selectedDate) {
+          d = DB.plan[i];
+          break;
+        }
+      }
+      var r = d.receta;
+      var html = '<div class="card" style="display:flex; justify-content:space-between; align-items:center;">' +
+        '<button class="btn btn-outline" style="padding:4px 10px;" onclick="changeDay(-1)">← Ant</button>' +
+        '<div style="text-align:center;">' +
+          '<div style="font-weight:800; font-size:14px;">' + d.fecha + '</div>' +
+          '<div style="font-size:11px; color:var(--text-muted);">' + (d.tipo === 'guarderia' ? 'Día de guardería (cena niño)' : 'Comida familiar en casa') + '</div>' +
+        '</div>' +
+        '<button class="btn btn-outline" style="padding:4px 10px;" onclick="changeDay(1)">Sig →</button>' +
+      '</div>';
 
       if (d.gDay) {
-        html += `
-          <div class="card" style="background:#f1f5f9; border-left:4px solid #0284c7;">
-            <div style="font-size:11px; font-weight:700; color:#0369a1; text-transform:uppercase;">🏫 Menú Guardería (Mediodía niño)</div>
-            <div style="font-size:12px; margin-top:4px;"><strong>1º:</strong> ${d.gDay.primero}</div>
-            <div style="font-size:12px;"><strong>2º:</strong> ${d.gDay.segundo} (${d.gDay.grupo})</div>
-            ${d.gDay.nitratos ? '<div style="font-size:10px; color:#047857; margin-top:4px; font-weight:700;">🥬 R21: Llevó espinacas/acelgas. Bloqueadas en la cena.</div>' : ''}
-            ${!d.confirmado ? '<div style="margin-top:6px;"><button onclick="confirmarR15(''+d.fecha+'')" class="btn btn-primary" style="padding:4px 8px; font-size:11px; background:#d97706;">Confirmar lectura dudosa</button></div>' : ''}
-          </div>
-        `;
+        html += '<div class="card" style="background:#f1f5f9; border-left:4px solid #0284c7;">' +
+          '<div style="font-size:11px; font-weight:700; color:#0369a1; text-transform:uppercase;">🏫 Menú Guardería (Mediodía niño)</div>' +
+          '<div style="font-size:12px; margin-top:4px;"><strong>1º:</strong> ' + d.gDay.primero + '</div>' +
+          '<div style="font-size:12px;"><strong>2º:</strong> ' + d.gDay.segundo + ' (' + d.gDay.grupo + ')</div>' +
+          (d.gDay.nitratos ? '<div style="font-size:10px; color:#047857; margin-top:4px; font-weight:700;">🥬 R21: Llevó espinacas/acelgas. Bloqueadas en la cena.</div>' : '') +
+          (!d.confirmado ? '<div style="margin-top:6px;"><button onclick="confirmarR15('' + d.fecha + '')" class="btn btn-primary" style="padding:4px 8px; font-size:11px; background:#d97706;">Confirmar lectura dudosa</button></div>' : '') +
+        '</div>';
       }
 
-      html += `
-        <div class="card">
-          <span class="badge" style="background:#ecfdf5; color:#047857;">${r.icon} ${r.grupo}</span>
-          <h2 style="font-size:16px; font-weight:800; margin-top:6px;">${r.nombre}</h2>
-          
-          <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin:12px 0; text-align:center;">
-            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px;">
-              <div style="font-size:10px; color:var(--text-muted);">Adulto 80kg</div>
-              <div style="font-weight:800; font-size:13px; color:var(--primary);">${r.p80}g prot</div>
-            </div>
-            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px;">
-              <div style="font-size:10px; color:var(--text-muted);">Adulto 60kg</div>
-              <div style="font-weight:800; font-size:13px; color:var(--primary);">${r.p60}g prot</div>
-            </div>
-            <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:6px;">
-              <div style="font-size:10px; color:#047857;">Niño 2 años</div>
-              <div style="font-weight:800; font-size:13px; color:#047857;">${r.pNino}g prot</div>
-            </div>
-          </div>
+      html += '<div class="card">' +
+        '<span class="badge" style="background:#ecfdf5; color:#047857;">' + r.icon + ' ' + r.grupo + '</span>' +
+        '<h2 style="font-size:16px; font-weight:800; margin-top:6px;">' + r.nombre + '</h2>' +
+        
+        '<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin:12px 0; text-align:center;">' +
+          '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px;">' +
+            '<div style="font-size:10px; color:var(--text-muted);">Adulto 80kg</div>' +
+            '<div style="font-weight:800; font-size:13px; color:var(--primary);">' + r.p80 + 'g prot</div>' +
+          '</div>' +
+          '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px;">' +
+            '<div style="font-size:10px; color:var(--text-muted);">Adulto 60kg</div>' +
+            '<div style="font-weight:800; font-size:13px; color:var(--primary);">' + r.p60 + 'g prot</div>' +
+          '</div>' +
+          '<div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:6px;">' +
+            '<div style="font-size:10px; color:#047857;">Niño 2 años</div>' +
+            '<div style="font-weight:800; font-size:13px; color:#047857;">' + r.pNino + 'g prot</div>' +
+          '</div>' +
+        '</div>' +
 
-          <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px; font-size:11px; color:#92400e;">
-            <strong>👶 Emplatado Seguro Niño (R23 / R24):</strong><br>
-            ${r.ninoText}
-          </div>
+        '<div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px; font-size:11px; color:#92400e;">' +
+          '<strong>👶 Emplatado Seguro Niño (R23 / R24):</strong><br>' +
+          r.ninoText +
+        '</div>' +
 
-          <div style="margin-top:12px; font-size:12px;">
-            <strong>🍐 Merienda común (transportable):</strong><br>
-            <span style="color:var(--text-muted);">${d.merienda}</span>
-          </div>
+        '<div style="margin-top:12px; font-size:12px;">' +
+          '<strong>🍐 Merienda común (transportable):</strong><br>' +
+          '<span style="color:var(--text-muted);">' + d.merienda + '</span>' +
+        '</div>' +
 
-          <div style="display:flex; gap:8px; margin-top:14px;">
-            <button onclick="cambiarRecetaDia('${d.fecha}')" class="btn btn-outline" style="flex:1;">🔄 Cambiar plato</button>
-          </div>
-        </div>
-      `;
+        '<div style="display:flex; gap:8px; margin-top:14px;">' +
+          '<button onclick="cambiarRecetaDia('' + d.fecha + '')" class="btn btn-outline" style="flex:1;">🔄 Cambiar plato</button>' +
+        '</div>' +
+      '</div>';
       el.innerHTML = html;
     }
 
     function changeDay(delta) {
-      const idx = DB.plan.findIndex(p => p.fecha === selectedDate);
+      var idx = -1;
+      for (var i = 0; i < DB.plan.length; i++) {
+        if (DB.plan[i].fecha === selectedDate) { idx = i; break; }
+      }
       if (idx !== -1 && DB.plan[idx + delta]) {
         selectedDate = DB.plan[idx + delta].fecha;
         render();
@@ -436,166 +450,165 @@
     }
 
     function cambiarRecetaDia(fecha) {
-      const d = DB.plan.find(p => p.fecha === fecha);
+      var d = null;
+      for (var i = 0; i < DB.plan.length; i++) {
+        if (DB.plan[i].fecha === fecha) { d = DB.plan[i]; break; }
+      }
       if (!d) return;
-      const currentIdx = RECETAS_CASA.findIndex(r => r.id === d.receta.id);
+      var currentIdx = 0;
+      for (var j = 0; j < RECETAS_CASA.length; j++) {
+        if (RECETAS_CASA[j].id === d.receta.id) { currentIdx = j; break; }
+      }
       d.receta = RECETAS_CASA[(currentIdx + 1) % RECETAS_CASA.length];
       save();
       render();
     }
 
     function confirmarR15(fecha) {
-      const d = DB.plan.find(p => p.fecha === fecha);
-      if (d) {
-        d.confirmado = true;
-        if (d.gDay) d.gDay.ok = true;
-        save();
-        render();
+      for (var i = 0; i < DB.plan.length; i++) {
+        if (DB.plan[i].fecha === fecha) {
+          DB.plan[i].confirmado = true;
+          if (DB.plan[i].gDay) DB.plan[i].gDay.ok = true;
+          break;
+        }
       }
+      save();
+      render();
     }
 
     function renderBalance(el) {
-      el.innerHTML = `
-        <div class="card">
-          <h2 style="font-size:15px; font-weight:800; margin-bottom:6px;">📊 Balance Semanal Poblacional (AESAN/EFSA)</h2>
-          <p style="font-size:11px; color:var(--text-muted); margin-bottom:12px;">Cómputo conjunto semanal del niño (Guardería + Cenas de casa).</p>
+      el.innerHTML = '<div class="card">' +
+        '<h2 style="font-size:15px; font-weight:800; margin-bottom:6px;">📊 Balance Semanal Poblacional (AESAN/EFSA)</h2>' +
+        '<p style="font-size:11px; color:var(--text-muted); margin-bottom:12px;">Cómputo conjunto semanal del niño (Guardería + Cenas de casa).</p>' +
 
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">
-            <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:10px; padding:10px;">
-              <div style="font-weight:700; color:#92400e;">🫘 Legumbres</div>
-              <div style="font-size:16px; font-weight:800; margin:2px 0;">4 raciones/sem</div>
-              <div style="font-size:10px; color:#b45309;">Meta: ≥4 · Óptimo</div>
-            </div>
-            <div style="background:#e0f2fe; border:1px solid #bae6fd; border-radius:10px; padding:10px;">
-              <div style="font-weight:700; color:#0369a1;">🐟 Pescado azul/blanco</div>
-              <div style="font-size:16px; font-weight:800; margin:2px 0;">4 raciones/sem</div>
-              <div style="font-size:10px; color:#0284c7;">Meta: ≥3 (0 mercurio)</div>
-            </div>
-            <div style="background:#fef9c3; border:1px solid #fef08a; border-radius:10px; padding:10px;">
-              <div style="font-weight:700; color:#854d0e;">🥚 Huevos camperos</div>
-              <div style="font-size:16px; font-weight:800; margin:2px 0;">3 raciones/sem</div>
-              <div style="font-size:10px; color:#a16207;">Meta: ≤4 · Cumplido</div>
-            </div>
-            <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:10px;">
-              <div style="font-weight:700; color:#065f46;">🛡️ Proteína Cena Niño</div>
-              <div style="font-size:16px; font-weight:800; margin:2px 0;">8,6 g media</div>
-              <div style="font-size:10px; color:#047857;">Rango EFSA: 6–11 g</div>
-            </div>
-          </div>
-        </div>
-      `;
+        '<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">' +
+          '<div style="background:#fef3c7; border:1px solid #fde68a; border-radius:10px; padding:10px;">' +
+            '<div style="font-weight:700; color:#92400e;">🫘 Legumbres</div>' +
+            '<div style="font-size:16px; font-weight:800; margin:2px 0;">4 raciones/sem</div>' +
+            '<div style="font-size:10px; color:#b45309;">Meta: ≥4 · Óptimo</div>' +
+          '</div>' +
+          '<div style="background:#e0f2fe; border:1px solid #bae6fd; border-radius:10px; padding:10px;">' +
+            '<div style="font-weight:700; color:#0369a1;">🐟 Pescado azul/blanco</div>' +
+            '<div style="font-size:16px; font-weight:800; margin:2px 0;">4 raciones/sem</div>' +
+            '<div style="font-size:10px; color:#0284c7;">Meta: ≥3 (0 mercurio)</div>' +
+          '</div>' +
+          '<div style="background:#fef9c3; border:1px solid #fef08a; border-radius:10px; padding:10px;">' +
+            '<div style="font-weight:700; color:#854d0e;">🥚 Huevos camperos</div>' +
+            '<div style="font-size:16px; font-weight:800; margin:2px 0;">3 raciones/sem</div>' +
+            '<div style="font-size:10px; color:#a16207;">Meta: ≤4 · Cumplido</div>' +
+          '</div>' +
+          '<div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:10px;">' +
+            '<div style="font-weight:700; color:#065f46;">🛡️ Proteína Cena Niño</div>' +
+            '<div style="font-size:16px; font-weight:800; margin:2px 0;">8,6 g media</div>' +
+            '<div style="font-size:10px; color:#047857;">Rango EFSA: 6–11 g</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
     }
 
     function renderGuarderia(el) {
-      let html = `
-        <div class="card">
-          <h2 style="font-size:15px; font-weight:800;">🏫 Menú Guardería · Noviembre 2026</h2>
-          <p style="font-size:11px; color:var(--text-muted); margin:4px 0 10px 0;">Sube el PDF o la foto descargada desde tu galería de archivos.</p>
-          
-          <label class="btn btn-primary" style="width:100%; cursor:pointer;">
-            📷 Seleccionar archivo / foto de la galería
-            <input type="file" accept="image/png,image/jpeg,image/webp,.pdf" style="display:none;" onchange="procesarArchivo(event)">
-          </label>
-        </div>
-        <div style="font-size:12px;">
-      `;
-      DB.plan.filter(p => p.gDay).forEach(p => {
-        const g = p.gDay;
-        html += `
-          <div class="card" style="padding:10px; display:flex; justify-content:space-between; align-items:center;">
-            <div>
-              <div style="font-weight:700;">${p.fecha} ${g.nitratos ? '🥬' : ''}</div>
-              <div style="font-size:11px; color:var(--text-muted);">${g.segundo}</div>
-            </div>
-            <span style="font-size:10px; padding:3px 8px; border-radius:6px; font-weight:700; background:${p.confirmado ? '#ecfdf5; color:#047857;' : '#fef3c7; color:#92400e;'}">
-              ${p.confirmado ? 'Confirmado' : 'Revisar R15'}
-            </span>
-          </div>
-        `;
-      });
-      html += `</div>`;
+      var html = '<div class="card">' +
+        '<h2 style="font-size:15px; font-weight:800;">🏫 Menú Guardería · Noviembre 2026</h2>' +
+        '<p style="font-size:11px; color:var(--text-muted); margin:4px 0 10px 0;">Sube el PDF o la foto descargada desde tu galería de archivos.</p>' +
+        '<label class="btn btn-primary" style="width:100%; cursor:pointer;">' +
+          '📷 Seleccionar archivo / foto de la galería' +
+          '<input type="file" accept="image/png,image/jpeg,image/webp,.pdf" style="display:none;" onchange="procesarArchivo(event)">' +
+        '</label>' +
+      '</div>' +
+      '<div style="font-size:12px;">';
+
+      for (var i = 0; i < DB.plan.length; i++) {
+        var p = DB.plan[i];
+        if (p.gDay) {
+          var g = p.gDay;
+          html += '<div class="card" style="padding:10px; display:flex; justify-content:space-between; align-items:center;">' +
+            '<div>' +
+              '<div style="font-weight:700;">' + p.fecha + ' ' + (g.nitratos ? '🥬' : '') + '</div>' +
+              '<div style="font-size:11px; color:var(--text-muted);">' + g.segundo + '</div>' +
+            '</div>' +
+            '<span style="font-size:10px; padding:3px 8px; border-radius:6px; font-weight:700; background:' + (p.confirmado ? '#ecfdf5; color:#047857;' : '#fef3c7; color:#92400e;') + '">' +
+              (p.confirmado ? 'Confirmado' : 'Revisar R15') +
+            '</span>' +
+          '</div>';
+        }
+      }
+      html += '</div>';
       el.innerHTML = html;
     }
 
     function procesarArchivo(event) {
-      const f = event.target.files && event.target.files[0];
+      var f = event.target.files && event.target.files[0];
       if (f) {
         alert("Archivo seleccionado: " + f.name + "\nLectura verificada para el mes de noviembre.");
       }
     }
 
     function renderCompra(el) {
-      let html = `
-        <div class="card">
-          <h2 style="font-size:15px; font-weight:800;">🛒 Lista Semanal de la Compra</h2>
-          <p style="font-size:11px; color:var(--text-muted);">Cantidades para 2 Adultos (80/60 kg) + Niño 2 años.</p>
-        </div>
-        <div class="card">
-          <h3 style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:8px;">Pescadería y Lonja (Rías Baixas)</h3>
-          <div style="font-size:12px; line-height:2;">
-            <label><input type="checkbox"> Merluza de pincho limpia (600 g)</label><br>
-            <label><input type="checkbox"> Xarda (verdel) fresca (550 g)</label><br>
-            <label><input type="checkbox"> Lomo de bonito del norte (500 g)</label><br>
-            <label><input type="checkbox"> Mejillón de batea limpio (1 kg)</label>
-          </div>
-        </div>
-        <div class="card">
-          <h3 style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:8px;">Huerta y Frutería</h3>
-          <div style="font-size:12px; line-height:2;">
-            <label><input type="checkbox"> Patata gallega de Xinzo (3 kg)</label><br>
-            <label><input type="checkbox"> Grelos de temporada (1 manojo)</label><br>
-            <label><input type="checkbox"> Calabaza de huerta (1 kg)</label><br>
-            <label><input type="checkbox"> Peras conferencia y mandarinas (2 kg)</label>
-          </div>
-        </div>
-      `;
-      el.innerHTML = html;
+      el.innerHTML = '<div class="card">' +
+        '<h2 style="font-size:15px; font-weight:800;">🛒 Lista Semanal de la Compra</h2>' +
+        '<p style="font-size:11px; color:var(--text-muted);">Cantidades para 2 Adultos (80/60 kg) + Niño 2 años.</p>' +
+      '</div>' +
+      '<div class="card">' +
+        '<h3 style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:8px;">Pescadería y Lonja (Rías Baixas)</h3>' +
+        '<div style="font-size:12px; line-height:2;">' +
+          '<label><input type="checkbox"> Merluza de pincho limpia (600 g)</label><br>' +
+          '<label><input type="checkbox"> Xarda (verdel) fresca (550 g)</label><br>' +
+          '<label><input type="checkbox"> Lomo de bonito del norte (500 g)</label><br>' +
+          '<label><input type="checkbox"> Mejillón de batea limpio (1 kg)</label>' +
+        '</div>' +
+      '</div>' +
+      '<div class="card">' +
+        '<h3 style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:8px;">Huerta y Frutería</h3>' +
+        '<div style="font-size:12px; line-height:2;">' +
+          '<label><input type="checkbox"> Patata gallega de Xinzo (3 kg)</label><br>' +
+          '<label><input type="checkbox"> Grelos de temporada (1 manojo)</label><br>' +
+          '<label><input type="checkbox"> Calabaza de huerta (1 kg)</label><br>' +
+          '<label><input type="checkbox"> Peras conferencia y mandarinas (2 kg)</label>' +
+        '</div>' +
+      '</div>';
     }
 
     function renderRecetas(el) {
-      let html = `<div class="card"><h2 style="font-size:15px; font-weight:800;">📖 Catálogo de Recetas Base</h2></div>`;
-      RECETAS_CASA.forEach(r => {
-        html += `
-          <div class="card" style="padding:10px;">
-            <div style="font-weight:800; font-size:13px;">${r.icon} ${r.nombre}</div>
-            <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Grupo: ${r.grupo} · Hidrato: ${r.hidrato}</div>
-            <div style="font-size:11px; color:#047857; margin-top:4px;"><strong>Niño:</strong> ${r.ninoText}</div>
-          </div>
-        `;
-      });
+      var html = '<div class="card"><h2 style="font-size:15px; font-weight:800;">📖 Catálogo de Recetas Base</h2></div>';
+      for (var i = 0; i < RECETAS_CASA.length; i++) {
+        var r = RECETAS_CASA[i];
+        html += '<div class="card" style="padding:10px;">' +
+          '<div style="font-weight:800; font-size:13px;">' + r.icon + ' ' + r.nombre + '</div>' +
+          '<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Grupo: ' + r.grupo + ' · Hidrato: ' + r.hidrato + '</div>' +
+          '<div style="font-size:11px; color:#047857; margin-top:4px;"><strong>Niño:</strong> ' + r.ninoText + '</div>' +
+        '</div>';
+      }
       el.innerHTML = html;
     }
 
     function renderAjustes(el) {
-      el.innerHTML = `
-        <div class="card">
-          <h2 style="font-size:15px; font-weight:800; margin-bottom:8px;">⚙️ Ajustes Familiares</h2>
-          <div style="font-size:12px; line-height:1.8;">
-            <strong>Provincia:</strong> Pontevedra (Galicia)<br>
-            <strong>Adulto 1:</strong> 80 kg (moderada actividad)<br>
-            <strong>Adulto 2:</strong> 60 kg (moderada actividad)<br>
-            <strong>Niño:</strong> 2 años (12,5 kg)<br>
-            <strong>Exclusiones:</strong> Coles de Bruselas, guisantes.<br>
-            <strong>Sal:</strong> 0 g añadida en olla familiar (R24).
-          </div>
-          <button onclick="localStorage.removeItem(KEY); init();" class="btn btn-danger" style="margin-top:14px; width:100%;">Restablecer datos originales</button>
-        </div>
-      `;
+      el.innerHTML = '<div class="card">' +
+        '<h2 style="font-size:15px; font-weight:800; margin-bottom:8px;">⚙️ Ajustes Familiares</h2>' +
+        '<div style="font-size:12px; line-height:1.8;">' +
+          '<strong>Provincia:</strong> Pontevedra (Galicia)<br>' +
+          '<strong>Adulto 1:</strong> 80 kg (moderada actividad)<br>' +
+          '<strong>Adulto 2:</strong> 60 kg (moderada actividad)<br>' +
+          '<strong>Niño:</strong> 2 años (12,5 kg)<br>' +
+          '<strong>Exclusiones:</strong> Coles de Bruselas, guisantes.<br>' +
+          '<strong>Sal:</strong> 0 g añadida en olla familiar (R24).' +
+        '</div>' +
+        '<button onclick="localStorage.removeItem(KEY); init();" class="btn btn-danger" style="margin-top:14px; width:100%;">Restablecer datos originales</button>' +
+      '</div>';
     }
 
     function regenerarMes() {
-      DB.plan.forEach((d, idx) => {
-        d.receta = RECETAS_CASA[(idx + Math.floor(Math.random() * 3)) % RECETAS_CASA.length];
-      });
+      for (var i = 0; i < DB.plan.length; i++) {
+        DB.plan[i].receta = RECETAS_CASA[(i + Math.floor(Math.random() * 3)) % RECETAS_CASA.length];
+      }
       save();
       render();
     }
 
     function closeModal() {
-      document.getElementById('modal').style.display = 'none';
+      var m = document.getElementById('modal');
+      if (m) m.style.display = 'none';
     }
 
-    // Arranque
     window.addEventListener('DOMContentLoaded', init);
   </script>
 </body>
