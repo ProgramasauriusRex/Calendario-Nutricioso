@@ -986,5 +986,72 @@
 
     init();
   </script>
+  <script>
+  (function() {
+    // 1. Generar iconos PNG reales en memoria (requisito estricto de Android/Pixel)
+    function crearIconoPNG(tamano) {
+      var c = document.createElement("canvas");
+      c.width = tamano;
+      c.height = tamano;
+      var ctx = c.getContext("2d");
+      ctx.fillStyle = "#065f46";
+      ctx.beginPath();
+      ctx.roundRect(0, 0, tamano, tamano, tamano * 0.22);
+      ctx.fill();
+      ctx.font = Math.floor(tamano * 0.58) + "px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("🍲", tamano / 2, tamano / 2 + tamano * 0.04);
+      return c.toDataURL("image/png");
+    }
+
+    var icon192 = crearIconoPNG(192);
+    var icon512 = crearIconoPNG(512);
+
+    // 2. Inyectar Web App Manifest válido para Chrome en Android
+    var manifestObj = {
+      id: location.pathname,
+      name: "NutriFami Rías Baixas",
+      short_name: "NutriFami",
+      description: "Planificador nutricional familiar e infantil",
+      start_url: location.href.split("?")[0],
+      scope: location.href.substring(0, location.href.lastIndexOf("/") + 1),
+      display: "standalone",
+      orientation: "portrait",
+      background_color: "#0f172a",
+      theme_color: "#065f46",
+      icons: [
+        { src: icon192, sizes: "192x192", type: "image/png", purpose: "any maskable" },
+        { src: icon512, sizes: "512x512", type: "image/png", purpose: "any maskable" }
+      ]
+    };
+
+    var linkManifest = document.createElement("link");
+    linkManifest.rel = "manifest";
+    linkManifest.href = "data:application/manifest+json;charset=utf-8," + encodeURIComponent(JSON.stringify(manifestObj));
+    document.head.appendChild(linkManifest);
+
+    // 3. Capturar el evento de instalación de Android y mostrar botón directo si está disponible
+    var promptGuardado = null;
+    window.addEventListener("beforeinstallprompt", function(e) {
+      e.preventDefault();
+      promptGuardado = e;
+      var header = document.querySelector("header");
+      if (header && !document.getElementById("btn-pwa-install")) {
+        var btn = document.createElement("button");
+        btn.id = "btn-pwa-install";
+        btn.textContent = "📲 Instalar App";
+        btn.style.cssText = "position:absolute; top:14px; right:14px; background:#f59e0b; color:#fff; border:none; padding:6px 10px; border-radius:8px; font-weight:800; font-size:11px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.25);";
+        btn.onclick = function() {
+          promptGuardado.prompt();
+          promptGuardado.userChoice.then(function() {
+            btn.style.display = "none";
+          });
+        };
+        header.appendChild(btn);
+      }
+    });
+  })();
+</script>
 </body>
 </html>
