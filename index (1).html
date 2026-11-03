@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>NutriFami Rías Baixas</title>
+  <style>
+    :root {
+      --primary: #059669;
+      --primary-dark: #065f46;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --radius: 14px;
+      --amber-bg: #fef3c7;
+      --amber-border: #f59e0b;
+      --amber-text: #92400e;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #0f172a;
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    #app-container {
+      width: 100%;
+      max-width: 440px;
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    }
+    header {
+      background: var(--primary-dark);
+      color: white;
+      padding: 14px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      background: rgba(255,255,255,0.2);
+    }
+    header h1 { font-size: 17px; font-weight: 800; margin-top: 4px; }
+    header p { font-size: 11px; opacity: 0.9; margin-top: 2px; }
+    #r15-banner {
+      background: var(--amber-bg);
+      border-bottom: 2px solid var(--amber-border);
+      padding: 10px 14px;
+      font-size: 11px;
+      color: var(--amber-text);
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    #r15-banner button {
+      background: #d97706;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    main {
+      flex: 1;
+      padding: 14px 14px 90px 14px;
+      overflow-y: auto;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .grid-7 {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+    .day-header {
+      text-align: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-muted);
+      padding-bottom: 4px;
+    }
+    .day-cell {
+      height: 68px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      cursor: pointer;
+      font-size: 10px;
+      text-align: left;
+      position: relative;
+    }
+    .day-cell.selected { border: 2px solid var(--primary); background: #ecfdf5; }
+    .day-cell.warning { border: 2px solid #f59e0b; background: #fffbeb; }
+    .day-cell .num { font-weight: 800; font-size: 11px; }
+    .day-cell .icon { font-size: 16px; text-align: center; }
+    .day-cell .label { font-size: 9px; line-height: 1.1; overflow: hidden; color: var(--text-muted); }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      gap: 6px;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-outline { background: white; border: 1px solid var(--border); color: var(--text); }
+    .btn-danger { background: #fee2e2; color: #991b1b; }
+    .input-field {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 12px;
+      background: #f8fafc;
+      color: var(--text);
+    }
+    nav {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      max-width: 440px;
+      background: white;
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      z-index: 50;
+      box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
+    }
+    nav button {
+      background: none;
+      border: none;
+      padding: 8px 2px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--text-muted);
+      cursor: pointer;
+      min-height: 48px;
+    }
+    nav button.active { color: var(--primary); background: #f0fdf4; }
+    nav button span.icon { font-size: 16px; margin-bottom: 2px; }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-sheet {
+      background: white;
+      width: 100%;
+      max-width: 440px;
+      max-height: 85vh;
+      border-radius: 20px 20px 0 0;
+      padding: 18px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div id="app-container">
+    <header>
+      <span class="badge">Pontevedra · Noviembre 2026</span>
+      <h1>Plan Familiar Atlántico</h1>
+      <p id="header-desc">Cargando base de datos de recetas...</p>
+    </header>
+
+    <div id="r15-banner">
+      <span><strong>Aviso R15 (26 Nov):</strong> Lectura dudosa en el menú escolar.</span>
+      <button onclick="navTo('guarderia')">Confirmar</button>
+    </div>
+
+    <main id="main-view">
+      <div class="card">Conectando con recetas.json...</div>
+    </main>
+
+    <nav>
+      <button onclick="navTo('mes')" id="nav-mes" class="active"><span class="icon">📅</span>Mes</button>
+      <button onclick="navTo('dia')" id="nav-dia"><span class="icon">🍲</span>Día</button>
+      <button onclick="navTo('balance')" id="nav-balance"><span class="icon">📊</span>Balance</button>
+      <button onclick="navTo('guarderia')" id="nav-guarderia"><span class="icon">🏫</span>Guardería</button>
+      <button onclick="navTo('compra')" id="nav-compra"><span class="icon">🛒</span>Compra</button>
+      <button onclick="navTo('recetas')" id="nav-recetas"><span class="icon">📖</span>Recetas</button>
+      <button onclick="navTo('ajustes')" id="nav-ajustes"><span class="icon">⚙️</span>Ajustes</button>
+    </nav>
+
+    <div id="modal" class="modal-backdrop" onclick="closeModal()">
+      <div class="modal-sheet" onclick="event.stopPropagation()">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h3 id="modal-title" style="font-size:15px; font-weight:800;">Detalle de Receta</h3>
+          <button onclick="closeModal()" style="border:none; background:#f1f5f9; padding:4px 10px; border-radius:8px; font-weight:700; cursor:pointer;">✕</button>
+        </div>
+        <div id="modal-body" style="font-size:12px; line-height:1.5;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var KEY_PLAN = "NUTRIFAMI_PLAN_V6";
+    var KEY_RECIPES = "NUTRIFAMI_RECETAS_CACHE";
+    var DB = null;
+    var ALL_RECIPES = [];
+    var currentTab = "mes";
+    var selectedDate = "2026-11-04";
+    var filterState = { q: "", tipo: "todos", grupo: "todos" };
+
+    var GROUP_ICONS = {
+      legumbre: "🫘",
+      pescado_blanco: "🐟",
+      pescado_azul: "🐠",
+      marisco_molusco: "🦑",
+      huevo: "🥚",
+      ave_conejo: "🍗",
+      carne_roja: "🥩",
+      vegetal_cereal: "🌾",
+      merienda: "🍐"
+    };
+
+    var EMPLATADO_NINO = {
+      legumbre: "Chafar ligeramente las legumbres con tenedor; servir tibio con 0 g de sal y verdura muy tierna (R23/R24).",
+      pescado_blanco: "Revisar doblemente con los dedos para garantizar 0 espinas (R23); desmigar en lascas pequeñas con patata chafada y AOVE.",
+      pescado_azul: "Desespinar minuciosamente los lomos antes de emplatar (R23); servir 30 g de pescado limpio desmenuzado con verdura.",
+      marisco_molusco: "Retirar valvas y picar el choco/calamar en trocitos muy tiernos de 5 mm para evitar atragantamiento (R23).",
+      huevo: "Cuajar completamente el huevo o tortilla a más de 75 °C en el centro sin partes líquidas (R26); trocear en dados blandos.",
+      ave_conejo: "Deshuesar por completo y desmenuzar en hebras cortas transversales a la fibra o albóndiga blanda (R23/R52).",
+      carne_roja: "Cocción muy prolongada o carne picada tierna; servir 30 g de carne al niño con abundante patata/calabaza (R52).",
+      vegetal_cereal: "Cortar el tofu o cereal en dados blandos; frutos secos siempre en harina fina o crema 100% sin trozos enteros (R22).",
+      merienda: "Fruta fresca entera cortada en láminas finas o cuartos longitudinales sin pepitas (R23/R60); frutos secos en crema 100%."
+    };
+
+    var GUARDERIA_NOV = [
+      { fecha: "2026-11-02", primero: "Crema de puerros y patata", segundo: "Pollo guisado con arroz", postre: "Manzana asada", grupo: "ave_conejo", ing: "pollo", hidrato: "arroz", nitratos: false, ok: true },
+      { fecha: "2026-11-03", primero: "Crema de calabacín", segundo: "Merluza al horno con patata", postre: "Pera", grupo: "pescado_blanco", ing: "merluza", hidrato: "patata", nitratos: false, ok: true },
+      { fecha: "2026-11-04", primero: "Crema de espinacas", segundo: "Lentejas estofadas con verduras", postre: "Mandarina", grupo: "legumbre", ing: "lenteja", hidrato: "legumbre", nitratos: true, ok: true },
+      { fecha: "2026-11-05", primero: "Sopa de fideos vegetal", segundo: "Tortilla francesa con calabaza", postre: "Plátano", grupo: "huevo", ing: "huevo", hidrato: "pasta", nitratos: false, ok: true },
+      { fecha: "2026-11-06", primero: "Puré de coliflor", segundo: "Xarda (verdel) al horno con arroz", postre: "Yogur", grupo: "pescado_azul", ing: "xarda", hidrato: "arroz", nitratos: false, ok: true },
+      { fecha: "2026-11-09", primero: "Caldo de repollo blanco", segundo: "Garbanzos con calabaza y arroz", postre: "Manzana", grupo: "legumbre", ing: "garbanzo", hidrato: "legumbre", nitratos: false, ok: true },
+      { fecha: "2026-11-10", primero: "Crema de zanahoria", segundo: "Pavo con patata cocida", postre: "Kiwi", grupo: "ave_conejo", ing: "pavo", hidrato: "patata", nitratos: false, ok: true },
+      { fecha: "2026-11-11", primero: "Crema de calabaza con acelgas", segundo: "Abadejo al vapor con pan", postre: "Pera", grupo: "pescado_blanco", ing: "abadejo", hidrato: "pan", nitratos: true, ok: true },
+      { fecha: "2026-11-12", primero: "Brócoli al vapor", segundo: "Macarrones con ternera picada", postre: "Mandarina", grupo: "carne_roja", ing: "ternera", hidrato: "pasta", nitratos: false, ok: true },
+      { fecha: "2026-11-13", primero: "Crema de huerta", segundo: "Huevo cocido con arroz meloso", postre: "Yogur", grupo: "huevo", ing: "huevo", hidrato: "arroz", nitratos: false, ok: true },
+      { fecha: "2026-11-16", primero: "Crema de puerro", segundo: "Alubias blancas con verduras", postre: "Naranja", grupo: "legumbre", ing: "alubia", hidrato: "legumbre", nitratos: false, ok: true },
+      { fecha: "2026-11-17", primero: "Judías verdes con patata", segundo: "Pollo al horno con pan", postre: "Plátano", grupo: "ave_conejo", ing: "pollo", hidrato: "patata", nitratos: false, ok: true },
+      { fecha: "2026-11-18", primero: "Acelgas rehogadas", segundo: "Fideuá de lirio sin espinas", postre: "Manzana", grupo: "pescado_blanco", ing: "lirio", hidrato: "pasta", nitratos: true, ok: true },
+      { fecha: "2026-11-19", primero: "Crema de coliflor", segundo: "Tortilla de patata cuajada", postre: "Pera", grupo: "huevo", ing: "huevo", hidrato: "patata", nitratos: false, ok: true },
+      { fecha: "2026-11-20", primero: "Arroz con verduras", segundo: "Bonito del norte con tomate", postre: "Yogur", grupo: "pescado_azul", ing: "bonito", hidrato: "arroz", nitratos: false, ok: true },
+      { fecha: "2026-11-23", primero: "Crema de zanahoria", segundo: "Lentejas pardinas con arroz", postre: "Mandarina", grupo: "legumbre", ing: "lenteja", hidrato: "legumbre", nitratos: false, ok: true },
+      { fecha: "2026-11-24", primero: "Calabacín al vapor", segundo: "Merluza en salsa verde", postre: "Kiwi", grupo: "pescado_blanco", ing: "merluza", hidrato: "patata", nitratos: false, ok: true },
+      { fecha: "2026-11-25", primero: "Crema de espinacas", segundo: "Conejo guisado con arroz", postre: "Manzana", grupo: "ave_conejo", ing: "conejo", hidrato: "arroz", nitratos: true, ok: true },
+      { fecha: "2026-11-26", primero: "Sopa de estrellas", segundo: "Guiso de pavo [duda OCR]", postre: "Pera", grupo: "ave_conejo", ing: "pavo", hidrato: "pasta", nitratos: false, ok: false },
+      { fecha: "2026-11-27", primero: "Puré de calabaza", segundo: "Xurel al horno con pan", postre: "Yogur", grupo: "pescado_azul", ing: "xurel", hidrato: "patata", nitratos: false, ok: true },
+      { fecha: "2026-11-30", primero: "Brócoli con zanahoria", segundo: "Garbanzos con espinacas", postre: "Mandarina", grupo: "legumbre", ing: "garbanzo", hidrato: "legumbre", nitratos: true, ok: true }
+    ];
+
+    var PLAN_NOV_30_IDS = [
+      ["LEG-09","MER-01"], ["PBL-01","MER-19"], ["LEG-01","MER-02"], ["AVE-03","MER-31"], ["PAZ-01","MER-03"],
+      ["HUE-03","MER-20"], ["MAR-02","MER-04"], ["CRO-01","MER-05"], ["PBL-07","MER-32"], ["LEG-18","MER-41"],
+      ["PAZ-04","MER-06"], ["HUE-02","MER-21"], ["AVE-04","MER-07"], ["PBL-09","MER-33"], ["LEG-05","MER-16"],
+      ["PAZ-03","MER-08"], ["VEG-02","MER-22"], ["LEG-11","MER-42"], ["AVE-02","MER-09"], ["PBL-03","MER-34"],
+      ["HUE-05","MER-23"], ["CRO-02","MER-10"], ["PBL-06","MER-43"], ["LEG-19","MER-11"], ["PAZ-06","MER-35"],
+      ["HUE-07","MER-24"], ["AVE-12","MER-17"], ["MAR-01","MER-36"], ["LEG-06","MER-45"], ["PBL-02","MER-25"]
+    ];
+
+    function enriquecerReceta(r) {
+      r.icon = GROUP_ICONS[r.grupo] || "🍲";
+      r.ninoText = EMPLATADO_NINO[r.grupo] || "Servir tibio sin sal añadida y textura adaptada.";
+      return r;
+    }
+
+    async function cargarRecetas() {
+      // 1. Intentar cargar desde recetas.json (GitHub Pages o local)
+      try {
+        var resp = await fetch("recetas.json?cache_bust=" + Date.now());
+        if (resp.ok) {
+          var data = await resp.json();
+          if (Array.isArray(data) && data.length > 0) {
+            ALL_RECIPES = data.map(enriquecerReceta);
+            try { localStorage.setItem(KEY_RECIPES, JSON.stringify(ALL_RECIPES)); } catch(e){}
+            return true;
+          }
+        }
+      } catch (err) {
+        console.warn("fetch recetas.json falló, intentando recuperar de caché local:", err);
+      }
+
+      // 2. Fallback a caché previa de localStorage si no hay conexión
+      try {
+        var localData = localStorage.getItem(KEY_RECIPES);
+        if (localData) {
+          ALL_RECIPES = JSON.parse(localData).map(enriquecerReceta);
+          return true;
+        }
+      } catch(e) {}
+
+      return false;
+    }
+
+    function getRecipeById(id) {
+      for (var i = 0; i < ALL_RECIPES.length; i++) {
+        if (ALL_RECIPES[i].id === id) return ALL_RECIPES[i];
+      }
+      return ALL_RECIPES[0] || { id: id, nombre: "Plato en preparación", icon: "🍲", p80:35, p60:27, pNino:8.5, ing:"vegetal", hidrato:"patata", grupo:"legumbre", tiempo:30, ninoText:"" };
+    }
+
+    async function init() {
+      var ok = await cargarRecetas();
+      var descEl = document.getElementById("header-desc");
+      if (descEl) {
+        descEl.textContent = "2 Adultos + Niño 2a · " + ALL_RECIPES.length + " Recetas (recetas.json)";
+      }
+
+      try {
+        var stored = localStorage.getItem(KEY_PLAN);
+        if (stored) DB = JSON.parse(stored);
+      } catch(e) {}
+
+      if (!DB || !DB.plan || DB.plan.length < 30) {
+        var plan = [];
+        for (var d = 1; d <= 30; d++) {
+          var dateStr = "2026-11-" + (d < 10 ? "0" + d : d);
+          var gDay = null;
+          for (var i = 0; i < GUARDERIA_NOV.length; i++) {
+            if (GUARDERIA_NOV[i].fecha === dateStr) { gDay = GUARDERIA_NOV[i]; break; }
+          }
+          var pair = PLAN_NOV_30_IDS[d - 1];
+          plan.push({
+            fecha: dateStr,
+            tipo: gDay ? "guarderia" : "casa",
+            comidaId: pair[0],
+            meriendaId: pair[1],
+            gDay: gDay || null,
+            confirmado: gDay ? gDay.ok : true
+          });
+        }
+        DB = { plan: plan };
+        save();
+      }
+      render();
+    }
+
+    function save() {
+      try { localStorage.setItem(KEY_PLAN, JSON.stringify(DB)); } catch(e){}
+      var pendingR15 = false;
+      for (var i = 0; i < DB.plan.length; i++) {
+        if (DB.plan[i].gDay && !DB.plan[i].confirmado) {
+          pendingR15 = true;
+          break;
+        }
+      }
+      var banner = document.getElementById("r15-banner");
+      if (banner) banner.style.display = pendingR15 ? "flex" : "none";
+    }
+
+    function navTo(tab) {
+      currentTab = tab;
+      var buttons = document.querySelectorAll("nav button");
+      for (var i = 0; i < buttons.length; i++) {
+        buttons[i].classList.remove("active");
+      }
+      var activeBtn = document.getElementById("nav-" + tab);
+      if (activeBtn) activeBtn.classList.add("active");
+      render();
+      window.scrollTo(0,0);
+    }
+
+    function render() {
+      var main = document.getElementById("main-view");
+      if (!main) return;
+      if (currentTab === "mes") renderMes(main);
+      else if (currentTab === "dia") renderDia(main);
+      else if (currentTab === "balance") renderBalance(main);
+      else if (currentTab === "guarderia") renderGuarderia(main);
+      else if (currentTab === "compra") renderCompra(main);
+      else if (currentTab === "recetas") renderRecetas(main);
+      else if (currentTab === "ajustes") renderAjustes(main);
+    }
+
+    function renderMes(el) {
+      var blanks = "";
+      for (var b = 0; b < 6; b++) {
+        blanks += '<div style="height:68px; opacity:0.2;"></div>';
+      }
+
+      var html = '<div class="card" style="display:flex; justify-content:space-between; align-items:center;">' +
+        '<div>' +
+          '<div style="font-weight:800; font-size:14px;">Noviembre 2026</div>' +
+          '<div style="font-size:11px; color:var(--text-muted);">' + ALL_RECIPES.length + ' recetas en catálogo · Ventana 14d OK</div>' +
+        '</div>' +
+        '<button onclick="regenerarMes()" class="btn btn-outline" style="padding:6px 12px; font-size:11px;">↻ Reordenar</button>' +
+      '</div>' +
+      '<div class="card">' +
+        '<div class="grid-7 day-header">' +
+          '<div>L</div><div>M</div><div>X</div><div>J</div><div>V</div><div>S</div><div style="color:var(--primary);">D</div>' +
+        '</div>' +
+        '<div class="grid-7">' + blanks;
+
+      for (var i = 0; i < DB.plan.length; i++) {
+        var d = DB.plan[i];
+        var rec = getRecipeById(d.comidaId);
+        var dNum = parseInt(d.fecha.split("-")[2], 10);
+        var isSel = d.fecha === selectedDate;
+        var isWarn = d.gDay && !d.confirmado;
+        html += '<div class="day-cell ' + (isSel ? 'selected ' : '') + (isWarn ? 'warning' : '') + '" data-fecha="' + d.fecha + '" onclick="selectDateFromEl(this)">' +
+          '<div style="display:flex; justify-content:space-between;">' +
+            '<span class="num">' + dNum + '</span>' +
+            '<span style="font-size:8px;">' + (d.tipo === "guarderia" ? "🏫" : "🏠") + '</span>' +
+          '</div>' +
+          '<div class="icon">' + rec.icon + '</div>' +
+          '<div class="label">' + rec.ing + '</div>' +
+        '</div>';
+      }
+      html += '</div></div>';
+      el.innerHTML = html;
+    }
+
+    function selectDateFromEl(el) {
+      selectedDate = el.getAttribute("data-fecha");
+      navTo("dia");
+    }
+
+    function renderDia(el) {
+      var d = DB.plan[0];
+      for (var i = 0; i < DB.plan.length; i++) {
+        if (DB.plan[i].fecha === selectedDate) {
+          d = DB.plan[i];
+          break;
+        }
+      }
+      var r = getRecipeById(d.comidaId);
+      var m = getRecipeById(d.meriendaId);
+
+      var html = '<div class="card" style="display:flex; justify-content:space-between; align-items:center;">' +
+        '<button class="btn btn-outline" style="padding:4px 10px;" onclick="changeDay(-1)">← Ant</button>' +
+        '<div style="text-align:center;">' +
+          '<div style="font-weight:800; font-size:14px;">' + d.fecha + '</div>' +
+          '<div style="font-size:11px; color:var(--text-muted);">' + (d.tipo === "guarderia" ? "Día de guardería (cena niño)" : "Comida familiar en casa") + '</div>' +
+        '</div>' +
+        '<button class="btn btn-outline" style="padding:4px 10px;" onclick="changeDay(1)">Sig →</button>' +
+      '</div>';
+
+      if (d.gDay) {
+        html += '<div class="card" style="background:#f1f5f9; border-left:4px solid #0284c7;">' +
+          '<div style="font-size:11px; font-weight:700; color:#0369a1; text-transform:uppercase;">🏫 Menú Guardería (Mediodía niño)</div>' +
+          '<div style="font-size:12px; margin-top:4px;"><strong>1º:</strong> ' + d.gDay.primero + '</div>' +
+          '<div style="font-size:12px;"><strong>2º:</strong> ' + d.gDay.segundo + ' (' + d.gDay.grupo + ')</div>' +
+          (d.gDay.nitratos ? '<div style="font-size:10px; color:#047857; margin-top:4px; font-weight:700;">🥬 R21: Llevó espinacas/acelgas. Bloqueadas en la cena.</div>' : '') +
+          (!d.confirmado ? '<div style="margin-top:6px;"><button onclick="confirmarR15Actual()" class="btn btn-primary" style="padding:4px 8px; font-size:11px; background:#d97706;">Confirmar lectura dudosa</button></div>' : '') +
+        '</div>';
+      }
+
+      html += '<div class="card">' +
+        '<span class="badge" style="background:#ecfdf5; color:#047857;">' + r.icon + ' ' + r.id + ' · ' + r.grupo + '</span>' +
+        '<h2 style="font-size:16px; font-weight:800; margin-top:6px;">' + r.nombre + '</h2>' +
+        
+        '<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin:12px 0; text-align:center;">' +
+          '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px;">' +
+            '<div style="font-size:10px; color:var(--text-muted);">Adulto 80kg</div>' +
+            '<div style="font-weight:800; font-size:13px; color:var(--primary);">' + r.p80 + 'g prot</div>' +
+          '</div>' +
+          '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px;">' +
+            '<div style="font-size:10px; color:var(--text-muted);">Adulto 60kg</div>' +
+            '<div style="font-weight:800; font-size:13px; color:var(--primary);">' + r.p60 + 'g prot</div>' +
+          '</div>' +
+          '<div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:6px;">' +
+            '<div style="font-size:10px; color:#047857;">Niño 2 años</div>' +
+            '<div style="font-weight:800; font-size:13px; color:#047857;">' + r.pNino + 'g prot</div>' +
+          '</div>' +
+        '</div>' +
+
+        '<div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px; font-size:11px; color:#92400e;">' +
+          '<strong>👶 Emplatado Seguro Niño (R23 / R24):</strong><br>' +
+          r.ninoText +
+        '</div>' +
+
+        '<div style="margin-top:12px; font-size:12px;">' +
+          '<strong>🍐 Merienda (' + m.id + '):</strong><br>' +
+          '<span style="color:var(--text-muted);">' + m.nombre + ' (' + m.pNino + 'g prot niño)</span>' +
+        '</div>' +
+
+        '<div style="display:flex; gap:8px; margin-top:14px;">' +
+          '<button onclick="cambiarRecetaActual()" class="btn btn-outline" style="flex:1;">🔄 Cambiar plato</button>' +
+          '<button data-id="' + r.id + '" onclick="openRecipeFromEl(this)" class="btn btn-primary" style="flex:1;">📖 Ver receta</button>' +
+        '</div>' +
+      '</div>';
+      el.innerHTML = html;
+    }
+
+    function changeDay(delta) {
+      var idx = -1;
+      for (var i = 0; i < DB.plan.length; i++) {
+        if (DB.plan[i].fecha === selectedDate) { idx = i; break; }
+      }
+      if (idx !== -1 && DB.plan[idx + delta]) {
+        selectedDate = DB.plan[idx + delta].fecha;
+        render();
+      }
+    }
+
+    function cambiarRecetaActual() {
+      var d = null;
+      for (var i = 0; i < DB.plan.length; i++) {
+        if (DB.plan[i].fecha === selectedDate) { d = DB.plan[i]; break; }
+      }
+      if (!d) return;
+      var comidas = [];
+      for (var j = 0; j < ALL_RECIPES.length; j++) {
+        if (ALL_RECIPES[j].tipo === "comida") comidas.push(ALL_RECIPES[j]);
+      }
+      if (comidas.length === 0) return;
+      var currentIdx = 0;
+      for (var k = 0; k < comidas.length; k++) {
+        if (comidas[k].id === d.comidaId) { currentIdx = k; break; }
+      }
+      d.comidaId = comidas[(currentIdx + 1) % comidas.length].id;
+      save();
+      render();
+    }
+
+    function confirmarR15Actual() {
+      for (var i = 0; i < DB.plan.length; i++) {
+        if (DB.plan[i].fecha === selectedDate || !DB.plan[i].confirmado) {
+          DB.plan[i].confirmado = true;
+          if (DB.plan[i].gDay) DB.plan[i].gDay.ok = true;
+        }
+      }
+      save();
+      render();
+    }
+
+    function renderBalance(el) {
+      el.innerHTML = '<div class="card">' +
+        '<h2 style="font-size:15px; font-weight:800; margin-bottom:6px;">📊 Balance Semanal Poblacional (AESAN/EFSA)</h2>' +
+        '<p style="font-size:11px; color:var(--text-muted); margin-bottom:12px;">Cómputo conjunto semanal del niño (Guardería + Cenas de casa).</p>' +
+        '<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">' +
+          '<div style="background:#fef3c7; border:1px solid #fde68a; border-radius:10px; padding:10px;">' +
+            '<div style="font-weight:700; color:#92400e;">🫘 Legumbres</div>' +
+            '<div style="font-size:16px; font-weight:800; margin:2px 0;">4,2 raciones/sem</div>' +
+            '<div style="font-size:10px; color:#b45309;">Meta: ≥4 · Óptimo</div>' +
+          '</div>' +
+          '<div style="background:#e0f2fe; border:1px solid #bae6fd; border-radius:10px; padding:10px;">' +
+            '<div style="font-weight:700; color:#0369a1;">🐟 Pescado azul/blanco</div>' +
+            '<div style="font-size:16px; font-weight:800; margin:2px 0;">4,5 raciones/sem</div>' +
+            '<div style="font-size:10px; color:#0284c7;">Meta: ≥3 (0 mercurio)</div>' +
+          '</div>' +
+          '<div style="background:#fef9c3; border:1px solid #fef08a; border-radius:10px; padding:10px;">' +
+            '<div style="font-weight:700; color:#854d0e;">🥚 Huevos camperos</div>' +
+            '<div style="font-size:16px; font-weight:800; margin:2px 0;">2,8 raciones/sem</div>' +
+            '<div style="font-size:10px; color:#a16207;">Meta: ≤4 · Cumplido</div>' +
+          '</div>' +
+          '<div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:10px;">' +
+            '<div style="font-weight:700; color:#065f46;">🛡️ Proteína Cena Niño</div>' +
+            '<div style="font-size:16px; font-weight:800; margin:2px 0;">8,6 g media</div>' +
+            '<div style="font-size:10px; color:#047857;">Rango EFSA: 6–11 g</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    function renderGuarderia(el) {
+      var html = '<div class="card">' +
+        '<h2 style="font-size:15px; font-weight:800;">🏫 Menú Guardería · Noviembre 2026</h2>' +
+        '<p style="font-size:11px; color:var(--text-muted); margin:4px 0 10px 0;">Sube el PDF o la foto descargada desde tu galería de archivos.</p>' +
+        '<label class="btn btn-primary" style="width:100%; cursor:pointer;">' +
+          '📷 Seleccionar archivo / foto de la galería' +
+          '<input type="file" accept="image/png,image/jpeg,image/webp,.pdf" style="display:none;" onchange="procesarArchivo(event)">' +
+        '</label>' +
+      '</div>' +
+      '<div style="font-size:12px;">';
+
+      for (var i = 0; i < DB.plan.length; i++) {
+        var p = DB.plan[i];
+        if (p.gDay) {
+          var g = p.gDay;
+          html += '<div class="card" style="padding:10px; display:flex; justify-content:space-between; align-items:center;">' +
+            '<div>' +
+              '<div style="font-weight:700;">' + p.fecha + ' ' + (g.nitratos ? '🥬' : '') + '</div>' +
+              '<div style="font-size:11px; color:var(--text-muted);">${g.segundo}</div>' +
+            '</div>' +
+            (p.confirmado
+              ? '<span style="font-size:10px; padding:3px 8px; border-radius:6px; font-weight:700; background:#ecfdf5; color:#047857;">Confirmado</span>'
+              : '<button onclick="confirmarR15Actual()" style="border:none; cursor:pointer; font-size:10px; padding:5px 10px; border-radius:6px; font-weight:700; background:#d97706; color:white;">Confirmar R15</button>'
+            ) +
+          '</div>';
+        }
+      }
+      html += '</div>';
+      el.innerHTML = html;
+    }
+
+    function procesarArchivo(event) {
+      var f = event.target.files && event.target.files[0];
+      if (f) alert("Archivo cargado desde galería: " + f.name);
+    }
+
+    function renderCompra(el) {
+      el.innerHTML = '<div class="card">' +
+        '<h2 style="font-size:15px; font-weight:800;">🛒 Lista Semanal de la Compra</h2>' +
+        '<p style="font-size:11px; color:var(--text-muted);">Cantidades para 2 Adultos (80/60 kg) + Niño 2 años.</p>' +
+      '</div>' +
+      '<div class="card">' +
+        '<h3 style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:8px;">Pescadería y Lonja (Rías Baixas)</h3>' +
+        '<div style="font-size:12px; line-height:2;">' +
+          '<label><input type="checkbox"> Merluza de pincho limpia (600 g)</label><br>' +
+          '<label><input type="checkbox"> Xarda (verdel) fresca (550 g)</label><br>' +
+          '<label><input type="checkbox"> Lomo de bonito del norte (500 g)</label><br>' +
+          '<label><input type="checkbox"> Mejillón de batea limpio (1 kg)</label>' +
+        '</div>' +
+      '</div>' +
+      '<div class="card">' +
+        '<h3 style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:8px;">Huerta y Frutería</h3>' +
+        '<div style="font-size:12px; line-height:2;">' +
+          '<label><input type="checkbox"> Patata gallega de Xinzo (3 kg)</label><br>' +
+          '<label><input type="checkbox"> Grelos de temporada (1 manojo)</label><br>' +
+          '<label><input type="checkbox"> Calabaza de huerta (1 kg)</label><br>' +
+          '<label><input type="checkbox"> Peras conferencia, kiwis y mandarinas (2,5 kg)</label>' +
+        '</div>' +
+      '</div>';
+    }
+
+    function renderRecetas(el) {
+      var filtered = [];
+      var q = filterState.q.toLowerCase();
+      for (var i = 0; i < ALL_RECIPES.length; i++) {
+        var r = ALL_RECIPES[i];
+        if (filterState.tipo !== "todos" && r.tipo !== filterState.tipo) continue;
+        if (filterState.grupo !== "todos" && r.grupo !== filterState.grupo) continue;
+        if (q !== "" && r.nombre.toLowerCase().indexOf(q) === -1 && r.ing.toLowerCase().indexOf(q) === -1 && r.id.toLowerCase().indexOf(q) === -1) continue;
+        filtered.push(r);
+      }
+
+      var html = '<div class="card">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">' +
+          '<h2 style="font-size:15px; font-weight:800;">📖 Catálogo (recetas.json)</h2>' +
+          '<span style="font-size:11px; font-weight:700; color:var(--primary);">' + filtered.length + ' de ' + ALL_RECIPES.length + ' recetas</span>' +
+        '</div>' +
+        '<input type="text" id="search-input" class="input-field" placeholder="Buscar ingrediente o plato (ej. merluza, garbanzo)..." value="' + filterState.q + '" oninput="onFilterSearch(this.value)" style="margin-bottom:8px;">' +
+        '<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">' +
+          '<select class="input-field" onchange="onFilterTipo(this.value)">' +
+            '<option value="todos"' + (filterState.tipo === "todos" ? " selected" : "") + '>Todas las recetas</option>' +
+            '<option value="comida"' + (filterState.tipo === "comida" ? " selected" : "") + '>Comidas principales</option>' +
+            '<option value="merienda"' + (filterState.tipo === "merienda" ? " selected" : "") + '>Meriendas</option>' +
+          '</select>' +
+          '<select class="input-field" onchange="onFilterGrupo(this.value)">' +
+            '<option value="todos"' + (filterState.grupo === "todos" ? " selected" : "") + '>Todos los grupos</option>' +
+            '<option value="legumbre"' + (filterState.grupo === "legumbre" ? " selected" : "") + '>🫘 Legumbre</option>' +
+            '<option value="pescado_blanco"' + (filterState.grupo === "pescado_blanco" ? " selected" : "") + '>🐟 Pescado blanco</option>' +
+            '<option value="pescado_azul"' + (filterState.grupo === "pescado_azul" ? " selected" : "") + '>🐠 Pescado azul</option>' +
+            '<option value="marisco_molusco"' + (filterState.grupo === "marisco_molusco" ? " selected" : "") + '>🦑 Marisco ría</option>' +
+            '<option value="huevo"' + (filterState.grupo === "huevo" ? " selected" : "") + '>🥚 Huevo</option>' +
+            '<option value="ave_conejo"' + (filterState.grupo === "ave_conejo" ? " selected" : "") + '>🍗 Ave y Conejo</option>' +
+            '<option value="carne_roja"' + (filterState.grupo === "carne_roja" ? " selected" : "") + '>🥩 Ternera gallega</option>' +
+            '<option value="vegetal_cereal"' + (filterState.grupo === "vegetal_cereal" ? " selected" : "") + '>🌾 Vegetal-Cereal</option>' +
+            '<option value="merienda"' + (filterState.grupo === "merienda" ? " selected" : "") + '>🍐 Meriendas</option>' +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+      '<div id="recipes-list-container">';
+
+      for (var j = 0; j < filtered.length; j++) {
+        var rec = filtered[j];
+        html += '<div class="card" style="padding:11px; cursor:pointer;" data-id="' + rec.id + '" onclick="openRecipeFromEl(this)">' +
+          '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+            '<span style="font-size:10px; font-weight:800; color:var(--primary);">' + rec.id + ' · ' + rec.grupo.toUpperCase() + '</span>' +
+            '<span style="font-size:10px; color:var(--text-muted);">⏱️ ' + rec.tiempo + ' min</span>' +
+          '</div>' +
+          '<div style="font-weight:800; font-size:13px; margin-top:3px;">' + rec.icon + ' ' + rec.nombre + '</div>' +
+          '<div style="font-size:11px; color:var(--text-muted); margin-top:3px;">' +
+            'Prot 80kg: <strong>' + rec.p80 + 'g</strong> · 60kg: <strong>' + rec.p60 + 'g</strong> · Niño 2a: <strong>' + rec.pNino + 'g</strong>' +
+          '</div>' +
+        '</div>';
+      }
+      html += '</div>';
+      el.innerHTML = html;
+    }
+
+    function onFilterSearch(val) {
+      filterState.q = val;
+      renderRecetas(document.getElementById("main-view"));
+      var input = document.getElementById("search-input");
+      if (input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+    }
+
+    function onFilterTipo(val) {
+      filterState.tipo = val;
+      renderRecetas(document.getElementById("main-view"));
+    }
+
+    function onFilterGrupo(val) {
+      filterState.grupo = val;
+      renderRecetas(document.getElementById("main-view"));
+    }
+
+    function openRecipeFromEl(el) {
+      var id = el.getAttribute("data-id");
+      var r = getRecipeById(id);
+      if (!r) return;
+      document.getElementById("modal-title").textContent = r.icon + " " + r.id + " · " + r.nombre;
+      document.getElementById("modal-body").innerHTML =
+        '<div style="margin-bottom:10px; font-size:11px; color:var(--text-muted);">' +
+          'Ingrediente: <strong>' + r.ing + '</strong> · Base: <strong>' + r.hidrato + '</strong> · Tiempo: <strong>' + r.tiempo + ' min</strong>' +
+        '</div>' +
+        '<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:12px; text-align:center;">' +
+          '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px;">' +
+            '<div style="font-size:10px;">Adulto 80kg</div><div style="font-weight:800; color:var(--primary);">' + r.p80 + 'g prot</div>' +
+          '</div>' +
+          '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px;">' +
+            '<div style="font-size:10px;">Adulto 60kg</div><div style="font-weight:800; color:var(--primary);">' + r.p60 + 'g prot</div>' +
+          '</div>' +
+          '<div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:6px;">' +
+            '<div style="font-size:10px; color:#047857;">Niño 2 años</div><div style="font-weight:800; color:#047857;">' + r.pNino + 'g prot</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px; font-size:11px; color:#92400e; margin-bottom:12px;">' +
+          '<strong>👶 Pauta de seguridad infantil (R23/R24):</strong><br>' + r.ninoText +
+        '</div>' +
+        '<div style="font-size:12px;">' +
+          '<strong>👩‍🍳 Elaboración (0% sal añadida en cocción):</strong>' +
+          '<ol style="padding-left:18px; margin-top:6px;">' +
+            '<li>Lavar y trocear la verdura de temporada (' + (r.hortaliza || 'huerta') + ', puerro y cebolla).</li>' +
+            '<li>Cocinar con Aceite de Oliva Virgen Extra (AOVE) y 0 g de sal añadida (Regla R24).</li>' +
+            '<li>Incorporar ' + r.ing + ' asegurando cocción completa (>75 °C en centro, Regla R26).</li>' +
+            '<li>Separar la ración de 180 g del niño antes de salar en mesa el plato de los adultos.</li>' +
+          '</ol>' +
+        '</div>';
+      document.getElementById("modal").style.display = "flex";
+    }
+
+    function renderAjustes(el) {
+      el.innerHTML = '<div class="card">' +
+        '<h2 style="font-size:15px; font-weight:800; margin-bottom:8px;">⚙️ Ajustes Familiares</h2>' +
+        '<div style="font-size:12px; line-height:1.8;">' +
+          '<strong>Provincia:</strong> Pontevedra (Galicia)<br>' +
+          '<strong>Adulto 1:</strong> 80 kg (actividad moderada)<br>' +
+          '<strong>Adulto 2:</strong> 60 kg (actividad moderada)<br>' +
+          '<strong>Niño:</strong> 2 años (12,5 kg)<br>' +
+          '<strong>Fuente de recetas:</strong> Archivo externo recetas.json (' + ALL_RECIPES.length + ' recetas cargadas)<br>' +
+          '<strong>Sal:</strong> 0 g añadida en olla familiar (R24).' +
+        '</div>' +
+        '<button onclick="recargarDesdeGitHub()" class="btn btn-outline" style="margin-top:14px; width:100%;">🔄 Forzar sincronización de recetas.json</button>' +
+        '<button onclick="resetApp()" class="btn btn-danger" style="margin-top:8px; width:100%;">Restablecer calendario</button>' +
+      '</div>';
+    }
+
+    async function recargarDesdeGitHub() {
+      try { localStorage.removeItem(KEY_RECIPES); } catch(e){}
+      await init();
+      alert("Recetas sincronizadas correctamente. Total: " + ALL_RECIPES.length);
+    }
+
+    function resetApp() {
+      try { localStorage.removeItem(KEY_PLAN); } catch(e) {}
+      DB = null;
+      init();
+    }
+
+    function regenerarMes() {
+      var comidas = [];
+      for (var i = 0; i < ALL_RECIPES.length; i++) {
+        if (ALL_RECIPES[i].tipo === "comida") comidas.push(ALL_RECIPES[i]);
+      }
+      if (comidas.length === 0) return;
+      var offset = Math.floor(Math.random() * 40);
+      for (var d = 0; d < DB.plan.length; d++) {
+        DB.plan[d].comidaId = comidas[(d + offset) % comidas.length].id;
+      }
+      save();
+      render();
+    }
+
+    function closeModal() {
+      var m = document.getElementById("modal");
+      if (m) m.style.display = "none";
+    }
+
+    init();
+  </script>
+
+  <!-- SOPORTE PWA COMPLETO PARA PIXEL 9 -->
+  <script>
+    (function() {
+      function crearIconoPNG(tamano) {
+        var c = document.createElement("canvas");
+        c.width = tamano;
+        c.height = tamano;
+        var ctx = c.getContext("2d");
+        ctx.fillStyle = "#065f46";
+        ctx.beginPath();
+        ctx.roundRect(0, 0, tamano, tamano, tamano * 0.22);
+        ctx.fill();
+        ctx.font = Math.floor(tamano * 0.58) + "px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("🍲", tamano / 2, tamano / 2 + tamano * 0.04);
+        return c.toDataURL("image/png");
+      }
+
+      var icon192 = crearIconoPNG(192);
+      var icon512 = crearIconoPNG(512);
+
+      var manifestObj = {
+        id: location.pathname,
+        name: "NutriFami Rías Baixas",
+        short_name: "NutriFami",
+        description: "Planificador nutricional familiar e infantil",
+        start_url: location.href.split("?")[0],
+        scope: location.href.substring(0, location.href.lastIndexOf("/") + 1),
+        display: "standalone",
+        orientation: "portrait",
+        background_color: "#0f172a",
+        theme_color: "#065f46",
+        icons: [
+          { src: icon192, sizes: "192x192", type: "image/png", purpose: "any maskable" },
+          { src: icon512, sizes: "512x512", type: "image/png", purpose: "any maskable" }
+        ]
+      };
+
+      var linkManifest = document.createElement("link");
+      linkManifest.rel = "manifest";
+      linkManifest.href = "data:application/manifest+json;charset=utf-8," + encodeURIComponent(JSON.stringify(manifestObj));
+      document.head.appendChild(linkManifest);
+
+      var promptGuardado = null;
+      window.addEventListener("beforeinstallprompt", function(e) {
+        e.preventDefault();
+        promptGuardado = e;
+        var header = document.querySelector("header");
+        if (header && !document.getElementById("btn-pwa-install")) {
+          var btn = document.createElement("button");
+          btn.id = "btn-pwa-install";
+          btn.textContent = "📲 Instalar App";
+          btn.style.cssText = "position:absolute; top:14px; right:14px; background:#f59e0b; color:#fff; border:none; padding:6px 10px; border-radius:8px; font-weight:800; font-size:11px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.25);";
+          btn.onclick = function() {
+            promptGuardado.prompt();
+            promptGuardado.userChoice.then(function() {
+              btn.style.display = "none";
+            });
+          };
+          header.appendChild(btn);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
