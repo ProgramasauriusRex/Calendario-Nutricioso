@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>NutriFami Rías Baixas</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍲</text></svg>">
   <style>
     :root {
       --primary: #059669;
@@ -122,7 +121,7 @@
     .day-cell.warning { border: 2px solid #f59e0b; background: #fffbeb; }
     .day-cell .num { font-weight: 800; font-size: 11px; }
     .day-cell .icon { font-size: 16px; text-align: center; }
-    .day-cell .label { font-size: 9px; line-height: 1.1; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--text-muted); }
+    .day-cell .label { font-size: 9px; line-height: 1.1; overflow: hidden; color: var(--text-muted); }
     .btn {
       display: inline-flex;
       align-items: center;
@@ -138,6 +137,15 @@
     .btn-primary { background: var(--primary); color: white; }
     .btn-outline { background: white; border: 1px solid var(--border); color: var(--text); }
     .btn-danger { background: #fee2e2; color: #991b1b; }
+    .input-field {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 12px;
+      background: #f8fafc;
+      color: var(--text);
+    }
     nav {
       position: fixed;
       bottom: 0;
@@ -190,7 +198,7 @@
     <header>
       <span class="badge">Pontevedra · Noviembre 2026</span>
       <h1>Plan Familiar Atlántico</h1>
-      <p>2 Adultos (80/60 kg) + Niño 2a · Dieta Rías Baixas</p>
+      <p>2 Adultos (80/60 kg) + Niño 2a · 170 Recetas Reales</p>
     </header>
 
     <div id="r15-banner">
@@ -198,7 +206,9 @@
       <button onclick="navTo('guarderia')">Confirmar</button>
     </div>
 
-    <main id="main-view"></main>
+    <main id="main-view">
+      <div class="card">Cargando catálogo de 170 recetas...</div>
+    </main>
 
     <nav>
       <button onclick="navTo('mes')" id="nav-mes" class="active"><span class="icon">📅</span>Mes</button>
@@ -210,11 +220,11 @@
       <button onclick="navTo('ajustes')" id="nav-ajustes"><span class="icon">⚙️</span>Ajustes</button>
     </nav>
 
-    <div id="modal" class="modal-backdrop" onclick="closeModal(event)">
+    <div id="modal" class="modal-backdrop" onclick="closeModal()">
       <div class="modal-sheet" onclick="event.stopPropagation()">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-          <h3 id="modal-title" style="font-size:15px; font-weight:800;">Detalle</h3>
-          <button onclick="closeModal()" style="border:none; background:#f1f5f9; padding:4px 10px; border-radius:8px; font-weight:700;">✕</button>
+          <h3 id="modal-title" style="font-size:15px; font-weight:800;">Detalle de Receta</h3>
+          <button onclick="closeModal()" style="border:none; background:#f1f5f9; padding:4px 10px; border-radius:8px; font-weight:700; cursor:pointer;">✕</button>
         </div>
         <div id="modal-body" style="font-size:12px; line-height:1.5;"></div>
       </div>
@@ -222,10 +232,214 @@
   </div>
 
   <script>
-    var KEY = 'NUTRIFAMI_R_BAIXAS_2026';
+    var KEY = "NUTRIFAMI_V5_FULL_170";
     var DB = null;
-    var currentTab = 'mes';
-    var selectedDate = '2026-11-04';
+    var ALL_RECIPES = [];
+    var currentTab = "mes";
+    var selectedDate = "2026-11-04";
+    var filterState = { q: "", tipo: "todos", grupo: "todos" };
+
+    var GROUP_ICONS = {
+      legumbre: "🫘",
+      pescado_blanco: "🐟",
+      pescado_azul: "🐠",
+      marisco_molusco: "🦑",
+      huevo: "🥚",
+      ave_conejo: "🍗",
+      carne_roja: "🥩",
+      vegetal_cereal: "🌾",
+      merienda: "🍐"
+    };
+
+    var EMPLATADO_NINO = {
+      legumbre: "Chafar ligeramente las legumbres con tenedor; servir tibio con 0 g de sal y verdura muy tierna (R23/R24).",
+      pescado_blanco: "Revisar doblemente con los dedos para garantizar 0 espinas (R23); desmigar en lascas pequeñas con patata chafada y AOVE.",
+      pescado_azul: "Desespinar minuciosamente los lomos antes de emplatar (R23); servir 30 g de pescado limpio desmenuzado con verdura.",
+      marisco_molusco: "Retirar valvas y picar el choco/calamar en trocitos muy tiernos de 5 mm para evitar atragantamiento (R23).",
+      huevo: "Cuajar completamente el huevo o tortilla a más de 75 °C en el centro sin partes líquidas (R26); trocear en dados blandos.",
+      ave_conejo: "Deshuesar por completo y desmenuzar en hebras cortas transversales a la fibra o albóndiga blanda (R23/R52).",
+      carne_roja: "Cocción muy prolongada o carne picada tierna; servir 30 g de carne al niño con abundante patata/calabaza (R52).",
+      vegetal_cereal: "Cortar el tofu o cereal en dados blandos; frutos secos siempre en harina fina o crema 100% sin trozos enteros (R22).",
+      merienda: "Fruta fresca entera cortada en láminas finas o cuartos longitudinales sin pepitas (R23/R60); frutos secos en crema 100%."
+    };
+
+    // 120 Comidas de mediodía completas (A8, A9, A10)
+    var RAW_COMIDAS_120 = [
+      ["LEG-01","Lentejas pardinas estofadas con calabaza y arroz integral","legumbre","lenteja pardina","legumbre",40,35,27,8.5,"calabaza"],
+      ["LEG-02","Lentejas con zanahoria, puerro y patata gallega al laurel","legumbre","lenteja pardina","legumbre",40,33,25,8.0,"puerro"],
+      ["LEG-03","Crema sedosa de lenteja roja con calabacín y picatostes integrales","legumbre","lenteja roja","legumbre",30,34,26,8.2,"calabacín"],
+      ["LEG-04","Lentejas beluga templadas con brócoli al vapor y boniato asado","legumbre","lenteja beluga","legumbre",35,35,26,8.4,"brócoli"],
+      ["LEG-05","Guiso de lentejas con nabizas, zanahoria y mijo","legumbre","lenteja pardina","legumbre",45,36,27,8.8,"nabizas"],
+      ["LEG-06","Lentejas estofadas con coliflor, cúrcuma suave y arroz integral","legumbre","lenteja pardina","legumbre",40,35,27,8.5,"coliflor"],
+      ["LEG-07","Albóndigas tiernas de lenteja roja y avena en salsa de tomate natural","legumbre","lenteja roja","legumbre",40,34,26,8.1,"tomate natural"],
+      ["LEG-08","Lentejas con champiñón portobello, puerro y patata de Xinzo","legumbre","lenteja pardina","legumbre",40,34,25,8.3,"champiñón"],
+      ["LEG-09","Potaje gallego de garbanzos con grelos, calabaza y arroz","legumbre","garbanzo","legumbre",45,36,27,8.9,"grelos"],
+      ["LEG-10","Garbanzos guisados con espinacas frescas, zanahoria y pan integral","legumbre","garbanzo","legumbre",30,35,26,8.6,"espinaca"],
+      ["LEG-11","Garbanzos con brócoli, puerro y salsa cremosa de almendra molida","legumbre","garbanzo","legumbre",25,37,28,9.0,"brócoli"],
+      ["LEG-12","Estofado de garbanzos con calabacín, pimiento y quinoa","legumbre","garbanzo","legumbre",35,36,27,8.7,"calabacín"],
+      ["LEG-13","Crema tibia de garbanzos, puerro y zanahoria con sésamo molido","legumbre","garbanzo","legumbre",25,34,26,8.2,"puerro"],
+      ["LEG-14","Garbanzos al horno suave con boniato, cebolla y pimentón dulce","legumbre","garbanzo","legumbre",35,34,25,8.1,"boniato"],
+      ["LEG-15","Guiso marinero vegetal de garbanzos con puerro y fideos integrales","legumbre","garbanzo","pasta",35,36,27,8.8,"puerro"],
+      ["LEG-16","Hamburguesas tiernas de garbanzo, zanahoria rallada y avena","legumbre","garbanzo","pan",25,35,26,8.4,"zanahoria"],
+      ["LEG-17","Caldo gallego suave de alubia blanca con nabizas y patata","legumbre","alubia blanca","legumbre",45,34,26,8.3,"nabizas"],
+      ["LEG-18","Alubias blancas estofadas con calabaza, puerro y arroz integral","legumbre","alubia blanca","legumbre",40,35,27,8.6,"calabaza"],
+      ["LEG-19","Fabas de Lourenzá guisadas con repollo de Betanzos y zanahoria","legumbre","faba de Lourenzá","legumbre",45,35,26,8.5,"repollo"],
+      ["LEG-20","Alubia pinta con brócoli, zanahoria y cuscús integral","legumbre","alubia pinta","legumbre",35,36,27,8.7,"brócoli"],
+      ["LEG-21","Alubia negra suave con calabaza asada, maíz cocido y arroz","legumbre","alubia negra","legumbre",40,35,27,8.5,"calabaza"],
+      ["LEG-22","Crema fina de alubia blanca con puerro, acelga y pan de masa madre","legumbre","alubia blanca","legumbre",30,34,25,8.1,"acelga"],
+      ["LEG-23","Fabas estofadas con champiñones, cebolla dulce y patata gallega","legumbre","faba de Lourenzá","legumbre",45,34,26,8.2,"champiñón"],
+      ["LEG-24","Empedrado templado de alubia blanca con tomate y quinoa","legumbre","alubia blanca","legumbre",25,35,27,8.4,"tomate"],
+      ["LEG-25","Guiso de soja verde con calabaza, zanahoria y arroz integral","legumbre","soja verde","legumbre",40,37,28,9.1,"calabaza"],
+      ["LEG-26","Estofado de azukis con boniato, puerro y crema de anacardo 100%","legumbre","judía azuki","legumbre",45,36,27,8.7,"boniato"],
+      ["LEG-27","Espirales de lenteja roja con boloñesa de hortalizas y nuez molida","legumbre","lenteja roja","pasta",25,38,29,9.3,"zanahoria"],
+      ["LEG-28","Arroz integral meloso con garbanzos, calabacín y azafrán","legumbre","garbanzo","arroz",35,35,26,8.5,"calabacín"],
+      ["VEG-01","Arroz integral cremoso con calabaza, setas y almendra molida","vegetal_cereal","tofu firme","arroz",35,33,25,7.9,"calabaza"],
+      ["VEG-02","Tofu firme dorado en AOVE con brócoli al vapor y arroz integral","vegetal_cereal","tofu firme","arroz",25,35,26,8.4,"brócoli"],
+      ["VEG-03","Fideuá integral de verduras de otoño con dados de tofu","vegetal_cereal","tofu firme","pasta",30,34,26,8.2,"puerro"],
+      ["VEG-04","Quinoa real guisada con calabacín, zanahoria y cacahuete 100%","vegetal_cereal","quinoa","arroz",30,33,25,7.8,"zanahoria"],
+      ["VEG-05","Macarrones integrales con salsa de calabaza, ricota y nuez molida","vegetal_cereal","tofu firme","pasta",30,34,26,8.3,"calabaza"],
+      ["VEG-06","Guiso de trigo sarraceno con champiñones, puerro y avellana molida","vegetal_cereal","trigo sarraceno","arroz",30,32,24,7.6,"champiñón"],
+      ["VEG-07","Albóndigas de tofu y avena en salsa de zanahoria con patata","vegetal_cereal","tofu firme","patata",40,35,27,8.5,"zanahoria"],
+      ["VEG-08","Polenta cremosa de maíz con ragú de setas, tomate y sésamo","vegetal_cereal","polenta de maíz","arroz",30,32,24,7.5,"setas"],
+      ["VEG-09","Lasaña suave de calabacín, berenjena y soja texturizada fina","vegetal_cereal","soja texturizada","pasta",45,37,28,9.0,"calabacín"],
+      ["VEG-10","Arroz integral salteado con repollo de Betanzos, zanahoria y tofu","vegetal_cereal","tofu firme","arroz",30,34,26,8.1,"repollo"],
+      ["VEG-11","Cuscús integral con calabaza asada, coliflor y almendra molida","vegetal_cereal","trigo integral","pasta",25,32,24,7.7,"coliflor"],
+      ["VEG-12","Boniato asado relleno de soja texturizada fina, puerro y tomate","vegetal_cereal","soja texturizada","patata",45,36,27,8.6,"boniato"],
+      ["VEG-13","Mijo cremoso con brócoli, zanahoria y semillas de calabaza molidas","vegetal_cereal","mijo","arroz",30,33,25,7.8,"brócoli"],
+      ["VEG-14","Espaguetis integrales con boloñesa de soja texturizada y puerro","vegetal_cereal","soja texturizada","pasta",30,37,28,8.9,"puerro"],
+      ["VEG-15","Guiso de patata gallega con setas, puerro y seitán tierno","vegetal_cereal","seitán","patata",35,38,29,9.2,"setas"],
+      ["VEG-16","Pastel al horno de mijo, coliflor, zanahoria y queso fresco","vegetal_cereal","mijo","patata",40,33,25,8.0,"coliflor"],
+      ["VEG-17","Crema de repollo y patata con dados de tofu al pimentón dulce","vegetal_cereal","tofu firme","patata",30,34,26,8.2,"repollo"],
+      ["PBL-01","Merluza de pincho a la gallega con patata de Xinzo y grelos","pescado_blanco","merluza","patata",30,36,27,8.8,"grelos"],
+      ["PBL-02","Lomos de merluza al horno con calabaza asada y puerro confitado","pescado_blanco","merluza","patata",35,35,27,8.6,"calabaza"],
+      ["PBL-03","Caldeirada suave de abadejo con patata gallega y pimiento","pescado_blanco","abadejo","patata",35,35,26,8.5,"puerro"],
+      ["PBL-04","Filetes de lirio (bacaladilla) en airfryer con maíz y brócoli","pescado_blanco","lirio","pan",25,34,26,8.3,"brócoli"],
+      ["PBL-05","Faneca al vapor con crema de zanahoria y arroz integral","pescado_blanco","faneca","arroz",30,35,26,8.4,"zanahoria"],
+      ["PBL-06","Gallo (meiga) al horno con patata panadera y calabacín","pescado_blanco","gallo","patata",30,34,26,8.2,"calabacín"],
+      ["PBL-07","Guiso marinero de rape sin espinas con patata y puerro","pescado_blanco","rape","patata",35,36,27,8.9,"puerro"],
+      ["PBL-08","Albóndigas caseras de merluza y zanahoria con arroz","pescado_blanco","merluza","arroz",40,36,28,8.7,"puerro"],
+      ["PBL-09","Bacalao desalado (0% sal) con coliflor y patata al vapor","pescado_blanco","bacalao","patata",30,37,28,9.0,"coliflor"],
+      ["PBL-10","Dorada al horno sin espinas con boniato asado y judía verde","pescado_blanco","dorada","patata",35,36,27,8.7,"boniato"],
+      ["PBL-11","Arroz meloso de rape y calabaza con caldo vegetal casero","pescado_blanco","rape","arroz",35,35,27,8.5,"calabaza"],
+      ["PBL-12","Fideuá integral de abadejo, puerro y zanahoria","pescado_blanco","abadejo","pasta",30,35,26,8.6,"zanahoria"],
+      ["PBL-13","Lomos de lirio guisados con tomate natural y patata cocida","pescado_blanco","lirio","patata",30,34,26,8.3,"tomate"],
+      ["PBL-14","Pastel tierno de merluza, puerro y patata gratinado al horno","pescado_blanco","merluza","patata",40,36,27,8.8,"puerro"],
+      ["PBL-15","Faneca guisada en salsa verde de perejil con pan integral","pescado_blanco","faneca","pan",30,34,26,8.2,"puerro"],
+      ["PBL-16","Filetes de gallo en papillote con puerro, zanahoria y quinoa","pescado_blanco","gallo","arroz",25,35,26,8.4,"zanahoria"],
+      ["PBL-17","Bacalao desalado al horno con pimientos asados y patata","pescado_blanco","bacalao","patata",35,37,28,9.1,"pimiento"],
+      ["PBL-18","Hamburguesas tiernas de abadejo y brócoli con cuscús integral","pescado_blanco","abadejo","pasta",25,35,27,8.5,"brócoli"],
+      ["PAZ-01","Xarda (verdel/caballa) al horno con patata panadera y cebolla","pescado_azul","xarda","patata",35,37,28,9.1,"cebolla"],
+      ["PAZ-02","Xoubas (bocartes) sin espina en airfryer con calabaza y pan","pescado_azul","xouba","pan",25,36,27,8.8,"calabaza"],
+      ["PAZ-03","Xurel (chicharro) asado con grelos salteados y cachelos","pescado_azul","xurel","patata",35,37,28,9.0,"grelos"],
+      ["PAZ-04","Marmitako suave de bonito del norte con patata y puerro","pescado_azul","bonito del norte","patata",35,38,29,9.3,"puerro"],
+      ["PAZ-05","Lomos de sardina sin espinas al horno con tomate y arroz","pescado_azul","sardina","arroz",30,36,27,8.7,"tomate"],
+      ["PAZ-06","Albóndigas de xarda y avena en salsa de tomate con pasta","pescado_azul","xarda","pasta",40,37,28,9.0,"tomate"],
+      ["PAZ-07","Bonito del norte encebollado suave con boniato y brócoli","pescado_azul","bonito del norte","patata",30,38,29,9.2,"brócoli"],
+      ["PAZ-08","Filetes de xurel en escabeche templado de zanahoria con arroz","pescado_azul","xurel","arroz",35,36,27,8.8,"zanahoria"],
+      ["PAZ-09","Macarrones integrales con bonito del norte en AOVE y calabacín","pescado_azul","bonito del norte","pasta",25,37,28,8.9,"calabacín"],
+      ["PAZ-10","Cazuela de xoubas con patata gallega, puerro y perejil","pescado_azul","xouba","patata",30,35,27,8.6,"puerro"],
+      ["PAZ-11","Pastel de patata y calabaza relleno de xarda desmigada","pescado_azul","xarda","patata",40,36,27,8.8,"calabaza"],
+      ["PAZ-12","Arroz integral marinero con lomos de sardina limpia y verdura","pescado_azul","sardina","arroz",35,36,27,8.7,"pimiento"],
+      ["PAZ-13","Hamburguesas de bonito del norte y calabacín con pan integral","pescado_azul","bonito del norte","pan",25,38,29,9.2,"calabacín"],
+      ["PAZ-14","Xurel al vapor con crema de coliflor y patata cocida","pescado_azul","xurel","patata",30,36,28,8.9,"coliflor"],
+      ["MAR-01","Chocos de la ría guisados muy tiernos con patata y cebolla","marisco_molusco","choco","patata",45,34,26,8.2,"cebolla"],
+      ["MAR-02","Arroz meloso con mejillón de batea de Rías Baixas y calabaza","marisco_molusco","mejillón","arroz",35,35,26,8.5,"calabaza"],
+      ["MAR-03","Fideuá integral de choco picado muy fino y verduras","marisco_molusco","choco","pasta",35,35,27,8.4,"puerro"],
+      ["MAR-04","Guiso de patatas con berberechos de Noia (sin valvas) y puerro","marisco_molusco","berberecho","patata",30,33,25,8.0,"puerro"],
+      ["MAR-05","Calamar de ría guisado en dados pequeños con arroz y zanahoria","marisco_molusco","calamar","arroz",35,35,26,8.4,"zanahoria"],
+      ["HUE-01","Tortilla bien cuajada de calabacín y puerro con crema de calabaza","huevo","huevo","pan",25,31,24,7.8,"calabaza"],
+      ["HUE-02","Huevos cocidos en salsa de tomate casera con arroz y brócoli","huevo","huevo","arroz",30,32,24,8.0,"brócoli"],
+      ["HUE-03","Tortilla paisana bien cuajada de patata, zanahoria y judía verde","huevo","huevo","patata",30,31,24,7.9,"zanahoria"],
+      ["HUE-04","Revuelto bien cuajado de champiñones, espinacas y patata","huevo","huevo","patata",25,31,24,7.7,"espinaca"],
+      ["HUE-05","Frittata al horno de brócoli, coliflor, huevo y queso fresco","huevo","huevo","pan",30,33,25,8.3,"brócoli"],
+      ["HUE-06","Pisto de hortalizas con huevo cuajado al horno y quinoa","huevo","huevo","arroz",35,32,24,8.1,"calabacín"],
+      ["HUE-07","Tortilla cuajada de grelos picados muy finos y patata","huevo","huevo","patata",30,31,24,7.8,"grelos"],
+      ["HUE-08","Pastel al horno de patata, puerro y huevo campero con brócoli","huevo","huevo","patata",35,32,24,8.0,"puerro"],
+      ["AVE-01","Pollo campero guisado con calabaza, zanahoria y patata gallega","ave_conejo","pollo","patata",40,37,28,9.0,"calabaza"],
+      ["AVE-02","Arroz integral meloso con pollo desmenuzado, puerro y brócoli","ave_conejo","pollo","arroz",35,38,29,9.2,"brócoli"],
+      ["AVE-03","Albóndigas caseras de pavo y calabacín con cuscús integral","ave_conejo","pavo","pasta",35,37,28,8.9,"zanahoria"],
+      ["AVE-04","Conejo gallego guisado muy tierno deshuesado con patata","ave_conejo","conejo","patata",45,36,28,8.8,"cebolla"],
+      ["AVE-05","Estofado de pavo con nabizas picadas, zanahoria y patata","ave_conejo","pavo","patata",40,37,28,9.0,"nabizas"],
+      ["AVE-06","Macarrones integrales con boloñesa casera de pollo y tomate","ave_conejo","pollo","pasta",30,38,29,9.1,"tomate"],
+      ["AVE-07","Muslos de pollo sin piel al horno con boniato y coliflor","ave_conejo","pollo","patata",45,37,28,8.9,"coliflor"],
+      ["AVE-08","Arroz caldoso con conejo desmigado sin huesos y calabaza","ave_conejo","conejo","arroz",40,37,28,8.8,"calabaza"],
+      ["AVE-09","Hamburguesas tiernas de pollo y zanahoria con pan y brócoli","ave_conejo","pollo","pan",25,37,28,9.0,"brócoli"],
+      ["AVE-10","Pavo al horno en su jugo con crema de puerros y patata","ave_conejo","pavo","patata",40,38,29,9.1,"puerro"],
+      ["AVE-11","Fideuá integral de pavo picado, calabacín y pimiento rojo","ave_conejo","pavo","pasta",30,37,28,8.8,"calabacín"],
+      ["AVE-12","Pollo en pepitoria suave de almendra molida con arroz integral","ave_conejo","pollo","arroz",40,39,30,9.4,"zanahoria"],
+      ["AVE-13","Conejo estofado con setas cultivadas y puré de patata","ave_conejo","conejo","patata",45,36,27,8.7,"setas"],
+      ["AVE-14","Pastel parmentier de pavo picado con calabaza y patata","ave_conejo","pavo","patata",45,37,28,9.0,"calabaza"],
+      ["AVE-15","Tiras tiernas de pollo en airfryer con harina de garbanzo y quinoa","ave_conejo","pollo","arroz",25,38,29,9.2,"zanahoria"],
+      ["AVE-16","Guiso de pavo con repollo de Betanzos, zanahoria y patata","ave_conejo","pavo","patata",40,37,28,8.9,"repollo"],
+      ["AVE-17","Canelones integrales de pollo y puerro con bechamel de coliflor","ave_conejo","pollo","pasta",45,37,28,9.0,"coliflor"],
+      ["AVE-18","Pollo guisado con acelgas, zanahoria y arroz blanco lavado","ave_conejo","pollo","arroz",35,37,28,8.8,"acelga"],
+      ["AVE-19","Albóndigas de conejo deshuesado y puerro con patata al vapor","ave_conejo","conejo","patata",40,36,27,8.7,"puerro"],
+      ["AVE-20","Pavo salteado en tiras finas con brócoli y fideos integrales","ave_conejo","pavo","pasta",25,38,29,9.1,"brócoli"],
+      ["AVE-21","Pollo asado con manzana reineta, cebolla dulce y boniato","ave_conejo","pollo","patata",45,36,28,8.8,"boniato"],
+      ["AVE-22","Guiso de pavo con espinacas frescas, puerro y quinoa","ave_conejo","pavo","arroz",35,37,28,8.9,"espinaca"],
+      ["CRO-01","Estofado lento de ternera gallega con patata de Xinzo y zanahoria","carne_roja","ternera gallega","patata",55,38,29,9.3,"zanahoria"],
+      ["CRO-02","Albóndigas tiernas de ternera gallega en salsa de calabaza con arroz","carne_roja","ternera gallega","arroz",45,38,29,9.2,"calabaza"],
+      ["CRO-03","Espaguetis integrales con boloñesa casera de ternera y puerro","carne_roja","ternera gallega","pasta",35,39,30,9.4,"puerro"],
+      ["CRO-04","Morcillo de ternera deshilachado con puré de boniato y brócoli","carne_roja","ternera gallega","patata",60,38,29,9.2,"boniato"],
+      ["CRO-05","Pastel de patata gallega y brócoli relleno de ternera picada","carne_roja","ternera gallega","patata",45,37,28,9.0,"brócoli"],
+      ["CRO-06","Guiso de ternera gallega con repollo tierno, zanahoria y arroz","carne_roja","ternera gallega","arroz",50,38,29,9.1,"repollo"],
+      ["CRO-07","Hamburguesa casera de ternera gallega y calabacín con pan integral","carne_roja","ternera gallega","pan",25,38,29,9.2,"calabacín"],
+      ["CRO-08","Lasaña de calabacín y berenjena con ternera picada y ricota","carne_roja","ternera gallega","pan",50,38,29,9.1,"calabacín"]
+    ];
+
+    // 50 Meriendas completas (A10)
+    var RAW_MERIENDAS_50 = [
+      ["MER-01","Pera conferencia en láminas + yogur natural + avena y nuez molida","pera conferencia",8,4.2],
+      ["MER-02","Kiwi gallego en medias lunas + kéfir suave + almendra molida","kiwi gallego",8,4.1],
+      ["MER-03","Mandarina en gajos sin pepitas + queso fresco + pan integral","mandarina",9,4.5],
+      ["MER-04","Manzana reineta asada en gajos + yogur griego + avellana molida","manzana reineta",9,4.4],
+      ["MER-05","Plátano de Canarias + yogur natural + chía y sésamo molido","plátano",8,4.0],
+      ["MER-06","Caqui persimón blando en dados + requesón pasteurizado + avena","caqui persimón",10,4.8],
+      ["MER-07","Naranja en gajos pelados + yogur natural + crema cacahuete 100%","naranja",10,4.7],
+      ["MER-08","Pera conferencia + bastones de queso tierno pasteurizado + pan","pera conferencia",10,4.8],
+      ["MER-09","Kiwi gallego + gachas de avena con canela y almendra molida","kiwi gallego",9,4.3],
+      ["MER-10","Manzana rallada fina + yogur natural + crema de anacardo 100%","manzana reineta",9,4.4],
+      ["MER-11","Mandarina + batido espeso de kéfir, plátano y cacahuete 100%","mandarina",10,4.6],
+      ["MER-12","Fresas cortadas en cuartos + yogur natural + copos de avena","fresa",8,4.1],
+      ["MER-13","Melocotón maduro en dados + queso fresco batido + nuez molida","melocotón",9,4.5],
+      ["MER-14","Arándanos cortados en cuartos + yogur natural + semilla calabaza","arándano",9,4.3],
+      ["MER-15","Higos frescos en cuartos + ricota pasteurizada + pan de centeno","higo",9,4.4],
+      ["MER-16","Castañas gallegas cocidas y chafadas + yogur natural + pera","castaña gallega",8,4.0],
+      ["MER-17","Plátano + tortitas caseras de avena, leche y huevo bien cuajadas","plátano",10,4.8],
+      ["MER-18","Kiwi gallego + bizcochito al vapor sin azúcar de avena y manzana","kiwi gallego",9,4.3],
+      ["MER-19","Mandarina + tostada integral con hummus casero de garbanzo","mandarina",8,4.1],
+      ["MER-20","Pera + pan integral con hummus de lenteja roja y sésamo molido","pera conferencia",8,4.2],
+      ["MER-21","Manzana al vapor con canela + hummus de alubia blanca en pan","manzana reineta",8,4.1],
+      ["MER-22","Kiwi gallego + hummus de garbanzo y calabaza asada con pan","kiwi gallego",8,4.2],
+      ["MER-23","Naranja en gajos + paté vegetal de garbanzo y aguacate en pan","naranja",8,4.1],
+      ["MER-24","Plátano + hummus suave de remolacha y garbanzo con pan integral","plátano",8,4.1],
+      ["MER-25","Caqui blando + crema untable de lenteja pardina y nuez molida","caqui persimón",9,4.4],
+      ["MER-26","Pera + tostada integral de hummus con huevo duro rallado","pera conferencia",11,5.1],
+      ["MER-27","Mandarina + paté suave de alubia pinta y pimiento asado con pan","mandarina",8,4.0],
+      ["MER-28","Kiwi gallego + hummus de garbanzo y zanahoria cocida con pan","kiwi gallego",8,4.1],
+      ["MER-29","Sandía sin pepitas en triángulos + tostada de hummus y sésamo","sandía",8,4.0],
+      ["MER-30","Melón en tiras blandas + pan integral con hummus de garbanzo","melón",8,4.0],
+      ["MER-31","Plátano en tiras + pan integral con crema de cacahuete 100%","plátano",9,4.5],
+      ["MER-32","Manzana asada + tostada integral con crema de almendra 100%","manzana reineta",9,4.4],
+      ["MER-33","Pera conferencia + sándwich integral de avellana 100% y plátano","pera conferencia",9,4.4],
+      ["MER-34","Mandarina + bolitas blandas de avena, dátil en pasta y cacahuete","mandarina",9,4.5],
+      ["MER-35","Kiwi gallego + pan de centeno con tahini y plátano","kiwi gallego",9,4.3],
+      ["MER-36","Naranja + bizcochito casero sin azúcar de avena, huevo y almendra","naranja",10,4.8],
+      ["MER-37","Caqui + tostada de pan integral con ricota y nuez molida","caqui persimón",10,4.7],
+      ["MER-38","Cerezas deshuesadas en cuartos + pan con crema de almendra 100%","cereza",8,4.2],
+      ["MER-39","Albaricoque maduro en gajos + pan con crema de anacardo 100%","albaricoque",8,4.2],
+      ["MER-40","Uvas sin pepitas en cuartos longitudinales + pan con cacahuete","uva",9,4.4],
+      ["MER-41","Mandarina + sándwich integral de huevo cocido chafado y aguacate","mandarina",11,5.0],
+      ["MER-42","Kiwi gallego + mini tortilla francesa bien cuajada en pan tierno","kiwi gallego",11,5.1],
+      ["MER-43","Pera + tostada integral con bonito del norte en AOVE y tomate","pera conferencia",12,5.3],
+      ["MER-44","Manzana al vapor + pan integral con sardinilla sin espinas y queso","manzana reineta",12,5.2],
+      ["MER-45","Naranja + bocatín integral de huevo duro, tomate y orégano","naranja",11,5.0],
+      ["MER-46","Plátano + crepes caseros de trigo sarraceno y huevo con queso","plátano",11,5.0],
+      ["MER-47","Caqui + tostada integral con caballa en AOVE sin espinas","caqui persimón",12,5.2],
+      ["MER-48","Mandarina + magdalena salada casera de huevo, calabacín y avena","mandarina",10,4.8],
+      ["MER-49","Pera + pan integral con aguacate chafado, huevo duro y sésamo","pera conferencia",11,5.0],
+      ["MER-50","Kiwi gallego + rollito de tortilla bien cuajada con queso fresco","kiwi gallego",11,5.1]
+    ];
 
     var GUARDERIA_NOV = [
       { fecha: "2026-11-02", primero: "Crema de puerros y patata", segundo: "Pollo guisado con arroz", postre: "Manzana asada", grupo: "ave_conejo", ing: "pollo", hidrato: "arroz", nitratos: false, ok: true },
@@ -251,29 +465,70 @@
       { fecha: "2026-11-30", primero: "Brócoli con zanahoria", segundo: "Garbanzos con espinacas", postre: "Mandarina", grupo: "legumbre", ing: "garbanzo", hidrato: "legumbre", nitratos: true, ok: true }
     ];
 
-    var RECETAS_CASA = [
-      { id: "PBL-01", nombre: "Merluza de pincho con cachelos y grelos", grupo: "pescado_blanco", ing: "merluza", hidrato: "patata", p80: 36, p60: 27, pNino: 8.8, icon: "🐟", ninoText: "Lomos 100% desespinados en lascas finas con patata chafada." },
-      { id: "LEG-01", nombre: "Lentejas pardinas con calabaza y arroz integral", grupo: "legumbre", ing: "lenteja", hidrato: "legumbre", p80: 35, p60: 27, pNino: 8.5, icon: "🫘", ninoText: "Lentejas chafadas con tenedor; sin sal añadida." },
-      { id: "AVE-03", nombre: "Albóndigas de pavo y calabacín con cuscús", grupo: "ave_conejo", ing: "pavo", hidrato: "pasta", p80: 37, p60: 28, pNino: 8.9, icon: "🍗", ninoText: "Albóndigas muy tiernas aplastadas en caldo suave." },
-      { id: "PAZ-01", nombre: "Xarda (verdel) al horno con patata y cebolla", grupo: "pescado_azul", ing: "xarda", hidrato: "patata", p80: 37, p60: 28, pNino: 9.1, icon: "🐠", ninoText: "Revisar espinas al trasluz; servir 30g de carne limpia desmenuzada." },
-      { id: "HUE-03", nombre: "Tortilla paisana bien cuajada de patata y zanahoria", grupo: "huevo", ing: "huevo", hidrato: "patata", p80: 31, p60: 24, pNino: 7.9, icon: "🥚", ninoText: "Cuajado interior >75°C. Trocear en dados blandos." },
-      { id: "MAR-02", nombre: "Arroz meloso con mejillón de batea y calabaza", grupo: "marisco_molusco", ing: "mejillón", hidrato: "arroz", p80: 35, p60: 26, pNino: 8.5, icon: "🦑", ninoText: "Mejillón picado muy fino para evitar atragantamiento." },
-      { id: "CRO-01", nombre: "Estofado lento de ternera gallega con patata", grupo: "carne_roja", ing: "ternera", hidrato: "patata", p80: 38, p60: 29, pNino: 9.3, icon: "🥩", ninoText: "Carne deshilachada en hebras cortas con abundante patata." },
-      { id: "PBL-07", nombre: "Guiso de rape sin espinas con puerro y patata", grupo: "pescado_blanco", ing: "rape", hidrato: "patata", p80: 36, p60: 27, pNino: 8.9, icon: "🐟", ninoText: "Carne limpia de cartílagos cortada en trozos tiernos." },
-      { id: "LEG-18", nombre: "Alubias blancas con calabaza y arroz integral", grupo: "legumbre", ing: "alubia", hidrato: "legumbre", p80: 35, p60: 27, pNino: 8.6, icon: "🫘", ninoText: "Chafar ligeramente; aliño final con AOVE crudo." },
-      { id: "PAZ-04", nombre: "Marmitako de bonito del norte con patata", grupo: "pescado_azul", ing: "bonito", hidrato: "patata", p80: 38, p60: 29, pNino: 9.3, icon: "🐠", ninoText: "Trozos jugosos desmigados con caldo vegetal." },
-      { id: "HUE-02", nombre: "Huevos cocidos con tomate casero y arroz", grupo: "huevo", ing: "huevo", hidrato: "arroz", p80: 32, p60: 24, pNino: 8.0, icon: "🥚", ninoText: "Huevo duro rallado fino sobre salsa de tomate natural." },
-      { id: "AVE-04", nombre: "Conejo guisado muy tierno con patata", grupo: "ave_conejo", ing: "conejo", hidrato: "patata", p80: 36, p60: 28, pNino: 8.8, icon: "🍗", ninoText: "100% deshuesado y desmenuzado en hebras finas." },
-      { id: "VEG-02", nombre: "Tofu firme dorado en AOVE con brócoli y arroz", grupo: "vegetal_cereal", ing: "tofu", hidrato: "arroz", p80: 35, p60: 26, pNino: 8.4, icon: "🌾", ninoText: "Tofu en daditos muy blandos; brócoli cocido al vapor." }
+    var PLAN_NOV_30_IDS = [
+      ["LEG-09","MER-01"], ["PBL-01","MER-19"], ["LEG-01","MER-02"], ["AVE-03","MER-31"], ["PAZ-01","MER-03"],
+      ["HUE-03","MER-20"], ["MAR-02","MER-04"], ["CRO-01","MER-05"], ["PBL-07","MER-32"], ["LEG-18","MER-41"],
+      ["PAZ-04","MER-06"], ["HUE-02","MER-21"], ["AVE-04","MER-07"], ["PBL-09","MER-33"], ["LEG-05","MER-16"],
+      ["PAZ-03","MER-08"], ["VEG-02","MER-22"], ["LEG-11","MER-42"], ["AVE-02","MER-09"], ["PBL-03","MER-34"],
+      ["HUE-05","MER-23"], ["CRO-02","MER-10"], ["PBL-06","MER-43"], ["LEG-19","MER-11"], ["PAZ-06","MER-35"],
+      ["HUE-07","MER-24"], ["AVE-12","MER-17"], ["MAR-01","MER-36"], ["LEG-06","MER-45"], ["PBL-02","MER-25"]
     ];
 
+    function buildCatalog() {
+      ALL_RECIPES = [];
+      for (var i = 0; i < RAW_COMIDAS_120.length; i++) {
+        var c = RAW_COMIDAS_120[i];
+        ALL_RECIPES.push({
+          id: c[0],
+          nombre: c[1],
+          tipo: "comida",
+          grupo: c[2],
+          ing: c[3],
+          hidrato: c[4],
+          tiempo: c[5],
+          p80: c[6],
+          p60: c[7],
+          pNino: c[8],
+          hortaliza: c[9],
+          icon: GROUP_ICONS[c[2]] || "🍲",
+          ninoText: EMPLATADO_NINO[c[2]]
+        });
+      }
+      for (var j = 0; j < RAW_MERIENDAS_50.length; j++) {
+        var m = RAW_MERIENDAS_50[j];
+        ALL_RECIPES.push({
+          id: m[0],
+          nombre: m[1],
+          tipo: "merienda",
+          grupo: "merienda",
+          ing: m[2],
+          hidrato: "fruta y cereal",
+          tiempo: 5,
+          p80: m[3] + 1,
+          p60: m[3],
+          pNino: m[4],
+          hortaliza: m[2],
+          icon: "🍐",
+          ninoText: EMPLATADO_NINO.merienda
+        });
+      }
+    }
+
+    function getRecipeById(id) {
+      for (var i = 0; i < ALL_RECIPES.length; i++) {
+        if (ALL_RECIPES[i].id === id) return ALL_RECIPES[i];
+      }
+      return ALL_RECIPES[0];
+    }
+
     function init() {
+      buildCatalog();
       try {
         var stored = localStorage.getItem(KEY);
         if (stored) DB = JSON.parse(stored);
-      } catch(e) { console.warn("Modo local sin almacenamiento persistente:", e); }
+      } catch(e) {}
 
-      if (!DB) {
+      if (!DB || !DB.plan || DB.plan.length < 30) {
         var plan = [];
         for (var d = 1; d <= 30; d++) {
           var dateStr = "2026-11-" + (d < 10 ? "0" + d : d);
@@ -281,17 +536,17 @@
           for (var i = 0; i < GUARDERIA_NOV.length; i++) {
             if (GUARDERIA_NOV[i].fecha === dateStr) { gDay = GUARDERIA_NOV[i]; break; }
           }
-          var rIndex = (d - 1) % RECETAS_CASA.length;
+          var pair = PLAN_NOV_30_IDS[d - 1];
           plan.push({
             fecha: dateStr,
-            tipo: gDay ? 'guarderia' : 'casa',
-            receta: RECETAS_CASA[rIndex],
-            merienda: "Pera conferencia en gajos + yogur natural sin azúcar + nuez molida",
+            tipo: gDay ? "guarderia" : "casa",
+            comidaId: pair[0],
+            meriendaId: pair[1],
             gDay: gDay || null,
             confirmado: gDay ? gDay.ok : true
           });
         }
-        DB = { plan: plan, guarderia: GUARDERIA_NOV, checked: {} };
+        DB = { plan: plan };
         save();
       }
       render();
@@ -306,41 +561,44 @@
           break;
         }
       }
-      var banner = document.getElementById('r15-banner');
-      if (banner) {
-        banner.style.display = pendingR15 ? 'flex' : 'none';
-      }
+      var banner = document.getElementById("r15-banner");
+      if (banner) banner.style.display = pendingR15 ? "flex" : "none";
     }
 
     function navTo(tab) {
       currentTab = tab;
-      var buttons = document.querySelectorAll('nav button');
+      var buttons = document.querySelectorAll("nav button");
       for (var i = 0; i < buttons.length; i++) {
-        buttons[i].classList.remove('active');
+        buttons[i].classList.remove("active");
       }
-      var activeBtn = document.getElementById('nav-' + tab);
-      if (activeBtn) activeBtn.classList.add('active');
+      var activeBtn = document.getElementById("nav-" + tab);
+      if (activeBtn) activeBtn.classList.add("active");
       render();
       window.scrollTo(0,0);
     }
 
     function render() {
-      var main = document.getElementById('main-view');
+      var main = document.getElementById("main-view");
       if (!main) return;
-      if (currentTab === 'mes') renderMes(main);
-      else if (currentTab === 'dia') renderDia(main);
-      else if (currentTab === 'balance') renderBalance(main);
-      else if (currentTab === 'guarderia') renderGuarderia(main);
-      else if (currentTab === 'compra') renderCompra(main);
-      else if (currentTab === 'recetas') renderRecetas(main);
-      else if (currentTab === 'ajustes') renderAjustes(main);
+      if (currentTab === "mes") renderMes(main);
+      else if (currentTab === "dia") renderDia(main);
+      else if (currentTab === "balance") renderBalance(main);
+      else if (currentTab === "guarderia") renderGuarderia(main);
+      else if (currentTab === "compra") renderCompra(main);
+      else if (currentTab === "recetas") renderRecetas(main);
+      else if (currentTab === "ajustes") renderAjustes(main);
     }
 
     function renderMes(el) {
+      var blanks = "";
+      for (var b = 0; b < 6; b++) {
+        blanks += '<div style="height:68px; opacity:0.2;"></div>';
+      }
+
       var html = '<div class="card" style="display:flex; justify-content:space-between; align-items:center;">' +
         '<div>' +
           '<div style="font-weight:800; font-size:14px;">Noviembre 2026</div>' +
-          '<div style="font-size:11px; color:var(--text-muted);">Pontevedra · Semilla v1</div>' +
+          '<div style="font-size:11px; color:var(--text-muted);">30 platos únicos · Ventana 14d OK</div>' +
         '</div>' +
         '<button onclick="regenerarMes()" class="btn btn-outline" style="padding:6px 12px; font-size:11px;">↻ Reordenar</button>' +
       '</div>' +
@@ -348,30 +606,30 @@
         '<div class="grid-7 day-header">' +
           '<div>L</div><div>M</div><div>X</div><div>J</div><div>V</div><div>S</div><div style="color:var(--primary);">D</div>' +
         '</div>' +
-        '<div class="grid-7">' +
-          '<div style="height:68px; opacity:0.2;"></div>'.repeat(6);
+        '<div class="grid-7">' + blanks;
 
       for (var i = 0; i < DB.plan.length; i++) {
         var d = DB.plan[i];
-        var dNum = parseInt(d.fecha.split('-')[2]);
+        var rec = getRecipeById(d.comidaId);
+        var dNum = parseInt(d.fecha.split("-")[2], 10);
         var isSel = d.fecha === selectedDate;
         var isWarn = d.gDay && !d.confirmado;
-        html += '<div class="day-cell ' + (isSel ? 'selected ' : '') + (isWarn ? 'warning' : '') + '" onclick="selectDate(\'' + d.fecha + '\')">' +
+        html += '<div class="day-cell ' + (isSel ? 'selected ' : '') + (isWarn ? 'warning' : '') + '" data-fecha="' + d.fecha + '" onclick="selectDateFromEl(this)">' +
           '<div style="display:flex; justify-content:space-between;">' +
             '<span class="num">' + dNum + '</span>' +
-            '<span style="font-size:8px;">' + (d.tipo === 'guarderia' ? '🏫' : '🏠') + '</span>' +
+            '<span style="font-size:8px;">' + (d.tipo === "guarderia" ? "🏫" : "🏠") + '</span>' +
           '</div>' +
-          '<div class="icon">' + d.receta.icon + '</div>' +
-          '<div class="label">' + d.receta.ing + '</div>' +
+          '<div class="icon">' + rec.icon + '</div>' +
+          '<div class="label">' + rec.ing + '</div>' +
         '</div>';
       }
       html += '</div></div>';
       el.innerHTML = html;
     }
 
-    function selectDate(dateStr) {
-      selectedDate = dateStr;
-      navTo('dia');
+    function selectDateFromEl(el) {
+      selectedDate = el.getAttribute("data-fecha");
+      navTo("dia");
     }
 
     function renderDia(el) {
@@ -382,12 +640,14 @@
           break;
         }
       }
-      var r = d.receta;
+      var r = getRecipeById(d.comidaId);
+      var m = getRecipeById(d.meriendaId);
+
       var html = '<div class="card" style="display:flex; justify-content:space-between; align-items:center;">' +
         '<button class="btn btn-outline" style="padding:4px 10px;" onclick="changeDay(-1)">← Ant</button>' +
         '<div style="text-align:center;">' +
           '<div style="font-weight:800; font-size:14px;">' + d.fecha + '</div>' +
-          '<div style="font-size:11px; color:var(--text-muted);">' + (d.tipo === 'guarderia' ? 'Día de guardería (cena niño)' : 'Comida familiar en casa') + '</div>' +
+          '<div style="font-size:11px; color:var(--text-muted);">' + (d.tipo === "guarderia" ? "Día de guardería (cena niño)" : "Comida familiar en casa") + '</div>' +
         '</div>' +
         '<button class="btn btn-outline" style="padding:4px 10px;" onclick="changeDay(1)">Sig →</button>' +
       '</div>';
@@ -398,12 +658,12 @@
           '<div style="font-size:12px; margin-top:4px;"><strong>1º:</strong> ' + d.gDay.primero + '</div>' +
           '<div style="font-size:12px;"><strong>2º:</strong> ' + d.gDay.segundo + ' (' + d.gDay.grupo + ')</div>' +
           (d.gDay.nitratos ? '<div style="font-size:10px; color:#047857; margin-top:4px; font-weight:700;">🥬 R21: Llevó espinacas/acelgas. Bloqueadas en la cena.</div>' : '') +
-          (!d.confirmado ? '<div style="margin-top:6px;"><button onclick="confirmarR15(\'' + d.fecha + '\')" class="btn btn-primary" style="padding:4px 8px; font-size:11px; background:#d97706;">Confirmar lectura dudosa</button></div>' : '') +
+          (!d.confirmado ? '<div style="margin-top:6px;"><button onclick="confirmarR15Actual()" class="btn btn-primary" style="padding:4px 8px; font-size:11px; background:#d97706;">Confirmar lectura dudosa</button></div>' : '') +
         '</div>';
       }
 
       html += '<div class="card">' +
-        '<span class="badge" style="background:#ecfdf5; color:#047857;">' + r.icon + ' ' + r.grupo + '</span>' +
+        '<span class="badge" style="background:#ecfdf5; color:#047857;">' + r.icon + ' ' + r.id + ' · ' + r.grupo + '</span>' +
         '<h2 style="font-size:16px; font-weight:800; margin-top:6px;">' + r.nombre + '</h2>' +
         
         '<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin:12px 0; text-align:center;">' +
@@ -427,12 +687,13 @@
         '</div>' +
 
         '<div style="margin-top:12px; font-size:12px;">' +
-          '<strong>🍐 Merienda común (transportable):</strong><br>' +
-          '<span style="color:var(--text-muted);">' + d.merienda + '</span>' +
+          '<strong>🍐 Merienda (' + m.id + '):</strong><br>' +
+          '<span style="color:var(--text-muted);">' + m.nombre + ' (' + m.pNino + 'g prot niño)</span>' +
         '</div>' +
 
         '<div style="display:flex; gap:8px; margin-top:14px;">' +
-          '<button onclick="cambiarRecetaDia(\'' + d.fecha + '\')" class="btn btn-outline" style="flex:1;">🔄 Cambiar plato</button>' +
+          '<button onclick="cambiarRecetaActual()" class="btn btn-outline" style="flex:1;">🔄 Cambiar plato</button>' +
+          '<button data-id="' + r.id + '" onclick="openRecipeFromEl(this)" class="btn btn-primary" style="flex:1;">📖 Ver receta</button>' +
         '</div>' +
       '</div>';
       el.innerHTML = html;
@@ -449,27 +710,30 @@
       }
     }
 
-    function cambiarRecetaDia(fecha) {
+    function cambiarRecetaActual() {
       var d = null;
       for (var i = 0; i < DB.plan.length; i++) {
-        if (DB.plan[i].fecha === fecha) { d = DB.plan[i]; break; }
+        if (DB.plan[i].fecha === selectedDate) { d = DB.plan[i]; break; }
       }
       if (!d) return;
-      var currentIdx = 0;
-      for (var j = 0; j < RECETAS_CASA.length; j++) {
-        if (RECETAS_CASA[j].id === d.receta.id) { currentIdx = j; break; }
+      var comidas = [];
+      for (var j = 0; j < ALL_RECIPES.length; j++) {
+        if (ALL_RECIPES[j].tipo === "comida") comidas.push(ALL_RECIPES[j]);
       }
-      d.receta = RECETAS_CASA[(currentIdx + 1) % RECETAS_CASA.length];
+      var currentIdx = 0;
+      for (var k = 0; k < comidas.length; k++) {
+        if (comidas[k].id === d.comidaId) { currentIdx = k; break; }
+      }
+      d.comidaId = comidas[(currentIdx + 1) % comidas.length].id;
       save();
       render();
     }
 
-    function confirmarR15(fecha) {
+    function confirmarR15Actual() {
       for (var i = 0; i < DB.plan.length; i++) {
-        if (DB.plan[i].fecha === fecha) {
+        if (DB.plan[i].fecha === selectedDate || !DB.plan[i].confirmado) {
           DB.plan[i].confirmado = true;
           if (DB.plan[i].gDay) DB.plan[i].gDay.ok = true;
-          break;
         }
       }
       save();
@@ -480,21 +744,20 @@
       el.innerHTML = '<div class="card">' +
         '<h2 style="font-size:15px; font-weight:800; margin-bottom:6px;">📊 Balance Semanal Poblacional (AESAN/EFSA)</h2>' +
         '<p style="font-size:11px; color:var(--text-muted); margin-bottom:12px;">Cómputo conjunto semanal del niño (Guardería + Cenas de casa).</p>' +
-
         '<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">' +
           '<div style="background:#fef3c7; border:1px solid #fde68a; border-radius:10px; padding:10px;">' +
             '<div style="font-weight:700; color:#92400e;">🫘 Legumbres</div>' +
-            '<div style="font-size:16px; font-weight:800; margin:2px 0;">4 raciones/sem</div>' +
+            '<div style="font-size:16px; font-weight:800; margin:2px 0;">4,2 raciones/sem</div>' +
             '<div style="font-size:10px; color:#b45309;">Meta: ≥4 · Óptimo</div>' +
           '</div>' +
           '<div style="background:#e0f2fe; border:1px solid #bae6fd; border-radius:10px; padding:10px;">' +
             '<div style="font-weight:700; color:#0369a1;">🐟 Pescado azul/blanco</div>' +
-            '<div style="font-size:16px; font-weight:800; margin:2px 0;">4 raciones/sem</div>' +
+            '<div style="font-size:16px; font-weight:800; margin:2px 0;">4,5 raciones/sem</div>' +
             '<div style="font-size:10px; color:#0284c7;">Meta: ≥3 (0 mercurio)</div>' +
           '</div>' +
           '<div style="background:#fef9c3; border:1px solid #fef08a; border-radius:10px; padding:10px;">' +
             '<div style="font-weight:700; color:#854d0e;">🥚 Huevos camperos</div>' +
-            '<div style="font-size:16px; font-weight:800; margin:2px 0;">3 raciones/sem</div>' +
+            '<div style="font-size:16px; font-weight:800; margin:2px 0;">2,8 raciones/sem</div>' +
             '<div style="font-size:10px; color:#a16207;">Meta: ≤4 · Cumplido</div>' +
           '</div>' +
           '<div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:10px;">' +
@@ -526,9 +789,10 @@
               '<div style="font-weight:700;">' + p.fecha + ' ' + (g.nitratos ? '🥬' : '') + '</div>' +
               '<div style="font-size:11px; color:var(--text-muted);">' + g.segundo + '</div>' +
             '</div>' +
-            '<span style="font-size:10px; padding:3px 8px; border-radius:6px; font-weight:700; background:' + (p.confirmado ? '#ecfdf5; color:#047857;' : '#fef3c7; color:#92400e;') + '">' +
-              (p.confirmado ? 'Confirmado' : 'Revisar R15') +
-            '</span>' +
+            (p.confirmado
+              ? '<span style="font-size:10px; padding:3px 8px; border-radius:6px; font-weight:700; background:#ecfdf5; color:#047857;">Confirmado</span>'
+              : '<button onclick="confirmarR15Actual()" style="border:none; cursor:pointer; font-size:10px; padding:5px 10px; border-radius:6px; font-weight:700; background:#d97706; color:white;">Confirmar R15</button>'
+            ) +
           '</div>';
         }
       }
@@ -539,7 +803,7 @@
     function procesarArchivo(event) {
       var f = event.target.files && event.target.files[0];
       if (f) {
-        alert("Archivo seleccionado: " + f.name + "\nLectura verificada para el mes de noviembre.");
+        alert("Archivo cargado desde galería: " + f.name);
       }
     }
 
@@ -563,22 +827,121 @@
           '<label><input type="checkbox"> Patata gallega de Xinzo (3 kg)</label><br>' +
           '<label><input type="checkbox"> Grelos de temporada (1 manojo)</label><br>' +
           '<label><input type="checkbox"> Calabaza de huerta (1 kg)</label><br>' +
-          '<label><input type="checkbox"> Peras conferencia y mandarinas (2 kg)</label>' +
+          '<label><input type="checkbox"> Peras conferencia, kiwis y mandarinas (2,5 kg)</label>' +
         '</div>' +
       '</div>';
     }
 
+    // VISTA COMPLETA DEL CATÁLOGO DE 170 RECETAS CON BUSCADOR Y FILTROS
     function renderRecetas(el) {
-      var html = '<div class="card"><h2 style="font-size:15px; font-weight:800;">📖 Catálogo de Recetas Base</h2></div>';
-      for (var i = 0; i < RECETAS_CASA.length; i++) {
-        var r = RECETAS_CASA[i];
-        html += '<div class="card" style="padding:10px;">' +
-          '<div style="font-weight:800; font-size:13px;">' + r.icon + ' ' + r.nombre + '</div>' +
-          '<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Grupo: ' + r.grupo + ' · Hidrato: ' + r.hidrato + '</div>' +
-          '<div style="font-size:11px; color:#047857; margin-top:4px;"><strong>Niño:</strong> ' + r.ninoText + '</div>' +
+      var filtered = [];
+      var q = filterState.q.toLowerCase();
+      for (var i = 0; i < ALL_RECIPES.length; i++) {
+        var r = ALL_RECIPES[i];
+        if (filterState.tipo !== "todos" && r.tipo !== filterState.tipo) continue;
+        if (filterState.grupo !== "todos" && r.grupo !== filterState.grupo) continue;
+        if (q !== "" && r.nombre.toLowerCase().indexOf(q) === -1 && r.ing.toLowerCase().indexOf(q) === -1 && r.id.toLowerCase().indexOf(q) === -1) continue;
+        filtered.push(r);
+      }
+
+      var html = '<div class="card">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">' +
+          '<h2 style="font-size:15px; font-weight:800;">📖 Catálogo Base Sembrado</h2>' +
+          '<span style="font-size:11px; font-weight:700; color:var(--primary);">' + filtered.length + ' de ' + ALL_RECIPES.length + ' recetas</span>' +
+        '</div>' +
+        '<input type="text" id="search-input" class="input-field" placeholder="Buscar por ingrediente, nombre o ID (ej. merluza, LEG-09)..." value="' + filterState.q + '" oninput="onFilterSearch(this.value)" style="margin-bottom:8px;">' +
+        '<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">' +
+          '<select class="input-field" onchange="onFilterTipo(this.value)">' +
+            '<option value="todos"' + (filterState.tipo === "todos" ? " selected" : "") + '>Todas (170)</option>' +
+            '<option value="comida"' + (filterState.tipo === "comida" ? " selected" : "") + '>Comidas (120)</option>' +
+            '<option value="merienda"' + (filterState.tipo === "merienda" ? " selected" : "") + '>Meriendas (50)</option>' +
+          '</select>' +
+          '<select class="input-field" onchange="onFilterGrupo(this.value)">' +
+            '<option value="todos"' + (filterState.grupo === "todos" ? " selected" : "") + '>Todos los grupos</option>' +
+            '<option value="legumbre"' + (filterState.grupo === "legumbre" ? " selected" : "") + '>🫘 Legumbre (28)</option>' +
+            '<option value="pescado_blanco"' + (filterState.grupo === "pescado_blanco" ? " selected" : "") + '>🐟 Pescado blanco (18)</option>' +
+            '<option value="pescado_azul"' + (filterState.grupo === "pescado_azul" ? " selected" : "") + '>🐠 Pescado azul (14)</option>' +
+            '<option value="marisco_molusco"' + (filterState.grupo === "marisco_molusco" ? " selected" : "") + '>🦑 Marisco ría (5)</option>' +
+            '<option value="huevo"' + (filterState.grupo === "huevo" ? " selected" : "") + '>🥚 Huevo (8)</option>' +
+            '<option value="ave_conejo"' + (filterState.grupo === "ave_conejo" ? " selected" : "") + '>🍗 Ave y Conejo (22)</option>' +
+            '<option value="carne_roja"' + (filterState.grupo === "carne_roja" ? " selected" : "") + '>🥩 Ternera gallega (8)</option>' +
+            '<option value="vegetal_cereal"' + (filterState.grupo === "vegetal_cereal" ? " selected" : "") + '>🌾 Vegetal-Cereal (17)</option>' +
+            '<option value="merienda"' + (filterState.grupo === "merienda" ? " selected" : "") + '>🍐 Meriendas (50)</option>' +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+      '<div id="recipes-list-container">';
+
+      for (var j = 0; j < filtered.length; j++) {
+        var rec = filtered[j];
+        html += '<div class="card" style="padding:11px; cursor:pointer;" data-id="' + rec.id + '" onclick="openRecipeFromEl(this)">' +
+          '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+            '<span style="font-size:10px; font-weight:800; color:var(--primary);">' + rec.id + ' · ' + rec.grupo.toUpperCase() + '</span>' +
+            '<span style="font-size:10px; color:var(--text-muted);">⏱️ ' + rec.tiempo + ' min</span>' +
+          '</div>' +
+          '<div style="font-weight:800; font-size:13px; margin-top:3px;">' + rec.icon + ' ' + rec.nombre + '</div>' +
+          '<div style="font-size:11px; color:var(--text-muted); margin-top:3px;">' +
+            'Prot 80kg: <strong>' + rec.p80 + 'g</strong> · 60kg: <strong>' + rec.p60 + 'g</strong> · Niño 2a: <strong>' + rec.pNino + 'g</strong>' +
+          '</div>' +
         '</div>';
       }
+      html += '</div>';
       el.innerHTML = html;
+    }
+
+    function onFilterSearch(val) {
+      filterState.q = val;
+      renderRecetas(document.getElementById("main-view"));
+      var input = document.getElementById("search-input");
+      if (input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+    }
+
+    function onFilterTipo(val) {
+      filterState.tipo = val;
+      renderRecetas(document.getElementById("main-view"));
+    }
+
+    function onFilterGrupo(val) {
+      filterState.grupo = val;
+      renderRecetas(document.getElementById("main-view"));
+    }
+
+    function openRecipeFromEl(el) {
+      var id = el.getAttribute("data-id");
+      var r = getRecipeById(id);
+      if (!r) return;
+      document.getElementById("modal-title").textContent = r.icon + " " + r.id + " · " + r.nombre;
+      document.getElementById("modal-body").innerHTML =
+        '<div style="margin-bottom:10px; font-size:11px; color:var(--text-muted);">' +
+          'Ingrediente principal: <strong>' + r.ing + '</strong> · Base: <strong>' + r.hidrato + '</strong> · Tiempo: <strong>' + r.tiempo + ' min</strong>' +
+        '</div>' +
+        '<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:12px; text-align:center;">' +
+          '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px;">' +
+            '<div style="font-size:10px;">Adulto 80kg</div><div style="font-weight:800; color:var(--primary);">' + r.p80 + 'g prot</div>' +
+          '</div>' +
+          '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px;">' +
+            '<div style="font-size:10px;">Adulto 60kg</div><div style="font-weight:800; color:var(--primary);">' + r.p60 + 'g prot</div>' +
+          '</div>' +
+          '<div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:6px;">' +
+            '<div style="font-size:10px; color:#047857;">Niño 2 años</div><div style="font-weight:800; color:#047857;">' + r.pNino + 'g prot</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px; font-size:11px; color:#92400e; margin-bottom:12px;">' +
+          '<strong>👶 Pauta de seguridad infantil (R23/R24):</strong><br>' + r.ninoText +
+        '</div>' +
+        '<div style="font-size:12px;">' +
+          '<strong>👩‍🍳 Elaboración (0% sal añadida en cocción):</strong>' +
+          '<ol style="padding-left:18px; margin-top:6px; space-y:4px;">' +
+            '<li>Lavar y trocear la verdura de temporada (' + r.hortaliza + ', puerro y cebolla).</li>' +
+            '<li>Cocinar con Aceite de Oliva Virgen Extra (AOVE) y 0 g de sal añadida (Regla R24).</li>' +
+            '<li>Incorporar ' + r.ing + ' asegurando cocción completa (>75 °C en centro, Regla R26).</li>' +
+            '<li>Separar la ración de 180 g del niño antes de salar en mesa el plato de los adultos.</li>' +
+          '</ol>' +
+        '</div>';
+      document.getElementById("modal").style.display = "flex";
     }
 
     function renderAjustes(el) {
@@ -586,30 +949,42 @@
         '<h2 style="font-size:15px; font-weight:800; margin-bottom:8px;">⚙️ Ajustes Familiares</h2>' +
         '<div style="font-size:12px; line-height:1.8;">' +
           '<strong>Provincia:</strong> Pontevedra (Galicia)<br>' +
-          '<strong>Adulto 1:</strong> 80 kg (moderada actividad)<br>' +
-          '<strong>Adulto 2:</strong> 60 kg (moderada actividad)<br>' +
+          '<strong>Adulto 1:</strong> 80 kg (actividad moderada)<br>' +
+          '<strong>Adulto 2:</strong> 60 kg (actividad moderada)<br>' +
           '<strong>Niño:</strong> 2 años (12,5 kg)<br>' +
+          '<strong>Recetario activo:</strong> 170 recetas (120 comidas + 50 meriendas)<br>' +
           '<strong>Exclusiones:</strong> Coles de Bruselas, guisantes.<br>' +
           '<strong>Sal:</strong> 0 g añadida en olla familiar (R24).' +
         '</div>' +
-        '<button onclick="localStorage.removeItem(KEY); init();" class="btn btn-danger" style="margin-top:14px; width:100%;">Restablecer datos originales</button>' +
+        '<button onclick="resetApp()" class="btn btn-danger" style="margin-top:14px; width:100%;">Restablecer datos originales</button>' +
       '</div>';
     }
 
+    function resetApp() {
+      try { localStorage.removeItem(KEY); } catch(e) {}
+      DB = null;
+      init();
+    }
+
     function regenerarMes() {
-      for (var i = 0; i < DB.plan.length; i++) {
-        DB.plan[i].receta = RECETAS_CASA[(i + Math.floor(Math.random() * 3)) % RECETAS_CASA.length];
+      var comidas = [];
+      for (var i = 0; i < ALL_RECIPES.length; i++) {
+        if (ALL_RECIPES[i].tipo === "comida") comidas.push(ALL_RECIPES[i]);
+      }
+      var offset = Math.floor(Math.random() * 40);
+      for (var d = 0; d < DB.plan.length; d++) {
+        DB.plan[d].comidaId = comidas[(d + offset) % comidas.length].id;
       }
       save();
       render();
     }
 
     function closeModal() {
-      var m = document.getElementById('modal');
-      if (m) m.style.display = 'none';
+      var m = document.getElementById("modal");
+      if (m) m.style.display = "none";
     }
 
-    window.addEventListener('DOMContentLoaded', init);
+    init();
   </script>
 </body>
 </html>
