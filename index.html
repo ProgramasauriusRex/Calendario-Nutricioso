@@ -592,14 +592,20 @@
       '</div>';
     }
 
-    function renderGuarderia(el) {
+        function renderGuarderia(el) {
       var html = '<div class="card">' +
-        '<h2 style="font-size:15px; font-weight:800;">🏫 Menú Guardería · Noviembre 2026</h2>' +
-        '<p style="font-size:11px; color:var(--text-muted); margin:4px 0 10px 0;">Sube el PDF o la foto descargada desde tu galería de archivos.</p>' +
+        '<h2 style="font-size:15px; font-weight:800;">🏫 Menú Guardería (Lector OCR)</h2>' +
+        '<p style="font-size:11px; color:var(--text-muted); margin:4px 0 10px 0;">Sube la foto del menú mensual desde tu galería para que el motor OCR lea los platos automáticamente.</p>' +
         '<label class="btn btn-primary" style="width:100%; cursor:pointer;">' +
-          '📷 Seleccionar archivo / foto de la galería' +
-          '<input type="file" accept="image/png,image/jpeg,image/webp,.pdf" style="display:none;" onchange="procesarArchivo(event)">' +
+          '📷 Seleccionar foto del menú escolar' +
+          '<input type="file" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="procesarArchivo(event)">' +
         '</label>' +
+        '<div id="ocr-status-box" style="display:none; margin-top:12px; padding:10px; border-radius:10px; background:#f0fdf4; border:1px solid #bbf7d0;">' +
+          '<div id="ocr-status-text" style="font-size:11px; font-weight:700; color:#166534; margin-bottom:6px;">Iniciando motor OCR...</div>' +
+          '<div style="background:#e2e8f0; border-radius:9999px; height:8px; overflow:hidden;">' +
+            '<div id="ocr-progress-bar" style="background:var(--primary); height:100%; width:0%; transition:width 0.2s;"></div>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
       '<div style="font-size:12px;">';
 
@@ -610,7 +616,7 @@
           html += '<div class="card" style="padding:10px; display:flex; justify-content:space-between; align-items:center;">' +
             '<div>' +
               '<div style="font-weight:700;">' + p.fecha + ' ' + (g.nitratos ? '🥬' : '') + '</div>' +
-              '<div style="font-size:11px; color:var(--text-muted);">${g.segundo}</div>' +
+              '<div style="font-size:11px; color:var(--text-muted);">' + g.segundo + ' (' + g.grupo + ')</div>' +
             '</div>' +
             (p.confirmado
               ? '<span style="font-size:10px; padding:3px 8px; border-radius:6px; font-weight:700; background:#ecfdf5; color:#047857;">Confirmado</span>'
@@ -623,10 +629,168 @@
       el.innerHTML = html;
     }
 
-    function procesarArchivo(event) {
+
+    // --- MOTOR OCR EN CLIENTE (Tesseract.js) ---
+    var ocrWorker = null;
+
+    async function procesarArchivo(event) {
       var f = event.target.files && event.target.files[0];
-      if (f) alert("Archivo cargado desde galería: " + f.name);
+      if (!f) return;
+
+      var statusBox = document.getElementById("ocr-status-box");
+      var progressBar = document.getElementById("ocr-progress-bar");
+      var statusText = document.getElementById("ocr-status-text");
+      if (statusBox) statusBox.style.display = "block";
+
+      try {
+        if (typeof Tesseract === "undefined") {
+          if (statusText) statusText.textContent = "Descargando motor OCR Tesseract...";
+          await cargarScriptTesseract();
+        }
+
+        if (statusText) statusText.textContent = "Iniciando análisis óptico de la imagen...";
+        
+        var worker = await Tesseract.createWorker('spa', 1, {
+          logger: function(m) {
+            if (m.status === 'recognizing text') {
+              var pct = Math.round(m.progress * 100);
+              if (progressBar) progressBar.style.width = pct + "%";
+              if (statusText) statusText.textContent = "Reconociendo texto del menú: " + pct + "%";
+            } else if (m.status) {
+              if (statusText) statusText.textContent = "Cargando diccionario en español...";
+            }
+          }
+        });
+
+        var res = await worker.recognize(f);
+        await worker.terminate();
+
+        var textoLeido = res.data.text;
+        var lineas = res.data.lines || [];
+        var confianzaMedia = res.data.confidence;
+
+        if (statusText) statusText.textContent = "Interpretando platos y reglas nutricionales...";
+        interpretarTextoMenu(textoLeido, lineas, confianzaMedia);
+
+        if (statusBox) {
+          statusText.innerHTML = "✅ <strong>Lectura completada.</strong> Menú actualizado en el calendario.";
+          setTimeout(function() { statusBox.style.display = "none"; }, 4000);
+        }
+      } catch (err) {
+        console.error("Error en OCR:", err);
+        if (statusText) {
+          statusText.innerHTML = "❌ <strong>No se pudo procesar la foto:</strong> " + (err.message || err);
+        }
+      }
     }
+
+    function cargarScriptTesseract() {
+      return new Promise(function(resolve, reject) {
+        var s = document.createElement("script");
+        s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+        s.onload = resolve;
+        s.onerror = function() { reject(new Error("No se pudo conectar con la librería OCR. Verifica tu conexión a internet.")); };
+        document.head.appendChild(s);
+      });
+    }
+
+    function interpretarTextoMenu(texto, lineas, confianzaGlobal) {
+      if (!texto || texto.trim().length === 0) {
+        alert("No se ha detectado texto en la foto. Prueba con una imagen con más iluminación o enfoque.");
+        return;
+      }
+
+      var diasLaborables = [];
+      for (var i = 0; i < DB.plan.length; i++) {
+        var d = DB.plan[i];
+        // Determinar día de la semana (Lunes a Viernes)
+        var parts = d.fecha.split("-");
+        var dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        var dow = dt.getDay();
+        if (dow >= 1 && dow <= 5) {
+          diasLaborables.push(d);
+        }
+      }
+
+      var bloques = texto.split(/\n\s*\n/);
+      if (bloques.length < 5) {
+        bloques = texto.split("\n").filter(function(l) { return l.trim().length > 3; });
+      }
+
+      var idxLaborable = 0;
+      for (var b = 0; b < bloques.length && idxLaborable < diasLaborables.length; b++) {
+        var frag = bloques[b].trim();
+        if (frag.length < 5) continue;
+
+        var clasif = clasificarComida(frag);
+        if (clasif.grupo) {
+          var targetDay = diasLaborables[idxLaborable];
+          var esDudoso = (confianzaGlobal < 70) || (clasif.confianza < 75);
+
+          targetDay.tipo = "guarderia";
+          targetDay.gDay = {
+            fecha: targetDay.fecha,
+            primero: clasif.primero || "Plato de verdura/sopa escolar",
+            segundo: clasif.segundo || frag.substring(0, 45),
+            postre: clasif.postre || "Fruta de temporada",
+            grupo: clasif.grupo,
+            ing: clasif.ing,
+            hidrato: clasif.hidrato,
+            nitratos: clasif.nitratos,
+            ok: !esDudoso
+          };
+          targetDay.confirmado = !esDudoso;
+          idxLaborable++;
+        }
+      }
+
+      save();
+      render();
+      alert("Se han reconocido y vinculado " + idxLaborable + " comidas escolares al mes. Si algún día quedó dudoso, se activará el aviso ámbar R15.");
+    }
+
+    function clasificarComida(txt) {
+      var low = txt.toLowerCase();
+      var nitratos = (low.indexOf("espinaca") !== -1 || low.indexOf("acelga") !== -1);
+      var grupo = null;
+      var ing = "mixto";
+      var hidrato = "patata";
+
+      if (low.indexOf("lenteja") !== -1) { grupo = "legumbre"; ing = "lenteja"; hidrato = "legumbre"; }
+      else if (low.indexOf("garbanzo") !== -1) { grupo = "legumbre"; ing = "garbanzo"; hidrato = "legumbre"; }
+      else if (low.indexOf("alubia") !== -1 || low.indexOf("faba") !== -1 || low.indexOf("judía") !== -1) { grupo = "legumbre"; ing = "alubia"; hidrato = "legumbre"; }
+      else if (low.indexOf("merluza") !== -1) { grupo = "pescado_blanco"; ing = "merluza"; hidrato = "patata"; }
+      else if (low.indexOf("abadejo") !== -1) { grupo = "pescado_blanco"; ing = "abadejo"; hidrato = "patata"; }
+      else if (low.indexOf("bacalao") !== -1) { grupo = "pescado_blanco"; ing = "bacalao"; hidrato = "patata"; }
+      else if (low.indexOf("rape") !== -1) { grupo = "pescado_blanco"; ing = "rape"; hidrato = "patata"; }
+      else if (low.indexOf("pescadilla") !== -1 || low.indexOf("lirio") !== -1) { grupo = "pescado_blanco"; ing = "lirio"; hidrato = "patata"; }
+      else if (low.indexOf("sardina") !== -1) { grupo = "pescado_azul"; ing = "sardina"; hidrato = "patata"; }
+      else if (low.indexOf("xarda") !== -1 || low.indexOf("caballa") !== -1 || low.indexOf("verdel") !== -1) { grupo = "pescado_azul"; ing = "xarda"; hidrato = "arroz"; }
+      else if (low.indexOf("bonito") !== -1 || low.indexOf("atun") !== -1) { grupo = "pescado_azul"; ing = "bonito"; hidrato = "arroz"; }
+      else if (low.indexOf("salmón") !== -1 || low.indexOf("salmon") !== -1) { grupo = "pescado_azul"; ing = "salmón"; hidrato = "arroz"; }
+      else if (low.indexOf("pollo") !== -1) { grupo = "ave_conejo"; ing = "pollo"; hidrato = "arroz"; }
+      else if (low.indexOf("pavo") !== -1) { grupo = "ave_conejo"; ing = "pavo"; hidrato = "pasta"; }
+      else if (low.indexOf("conejo") !== -1) { grupo = "ave_conejo"; ing = "conejo"; hidrato = "patata"; }
+      else if (low.indexOf("ternera") !== -1) { grupo = "carne_roja"; ing = "ternera"; hidrato = "pasta"; }
+      else if (low.indexOf("cerdo") !== -1 || low.indexOf("magro") !== -1) { grupo = "carne_roja"; ing = "cerdo"; hidrato = "arroz"; }
+      else if (low.indexOf("tortilla") !== -1 || low.indexOf("huevo") !== -1 || low.indexOf("revuelto") !== -1) { grupo = "huevo"; ing = "huevo"; hidrato = "patata"; }
+
+      var partes = txt.split(/[,\n\/\-]/);
+      var primero = partes.length > 1 ? partes[0].trim() : "1º " + txt.substring(0, 30);
+      var segundo = partes.length > 1 ? partes[1].trim() : (grupo ? grupo.replace('_', ' ') : txt.substring(0, 35));
+
+      return {
+        grupo: grupo,
+        ing: ing,
+        hidrato: hidrato,
+        primero: primero,
+        segundo: segundo,
+        postre: "Fruta fresca",
+        nitratos: nitratos,
+        confianza: 80
+      };
+    }
+
 
     function renderCompra(el) {
       el.innerHTML = '<div class="card">' +
