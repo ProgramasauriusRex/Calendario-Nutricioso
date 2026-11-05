@@ -118,6 +118,22 @@
       position: relative;
     }
     .day-cell.selected { border: 2px solid var(--primary); background: #ecfdf5; }
+    .day-cell.today { border: 2px solid #2563eb; background: #eff6ff; }
+    .day-cell.today .num { color: #1d4ed8; font-weight: 900; }
+    .day-cell.today::after {
+      content: "HOY";
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      font-size: 7px;
+      font-weight: 800;
+      color: #1d4ed8;
+      background: #dbeafe;
+      padding: 0px 3px;
+      border-radius: 4px;
+      letter-spacing: 0.3px;
+    }
+    .day-cell.today.selected { border: 2px solid #1d4ed8; background: #dbeafe; }
     .day-cell.warning { border: 2px solid #f59e0b; background: #fffbeb; }
     .day-cell .num { font-weight: 800; font-size: 11px; }
     .day-cell .icon { font-size: 16px; text-align: center; }
@@ -555,6 +571,12 @@
         blanks += '<div style="height:68px; opacity:0.2;"></div>';
       }
 
+      var now = new Date();
+      var yH = now.getFullYear();
+      var mH = (now.getMonth() + 1 < 10 ? "0" : "") + (now.getMonth() + 1);
+      var dH = (now.getDate() < 10 ? "0" : "") + now.getDate();
+      var hoyStr = yH + "-" + mH + "-" + dH;
+
       var html = '<div class="card" style="display:flex; justify-content:space-between; align-items:center;">' +
         '<div>' +
           '<div style="font-weight:800; font-size:14px;">Noviembre 2026</div>' +
@@ -572,9 +594,16 @@
         var d = DB.plan[i];
         var rec = getRecipeById(d.comidaId);
         var dNum = parseInt(d.fecha.split("-")[2], 10);
-        var isSel = d.fecha === selectedDate;
-        var isWarn = d.gDay && !d.confirmado;
-        html += '<div class="day-cell ' + (isSel ? 'selected ' : '') + (isWarn ? 'warning' : '') + '" data-fecha="' + d.fecha + '" onclick="selectDateFromEl(this)">' +
+        var isSel = (d.fecha === selectedDate);
+        var isToday = (d.fecha === hoyStr);
+        var isWarn = (d.gDay && !d.confirmado);
+
+        var cellClass = "day-cell";
+        if (isToday) cellClass += " today";
+        if (isSel) cellClass += " selected";
+        if (isWarn) cellClass += " warning";
+
+        html += '<div class="' + cellClass + '" data-fecha="' + d.fecha + '" onclick="selectDateFromEl(this)">' +
           '<div style="display:flex; justify-content:space-between;">' +
             '<span class="num">' + dNum + '</span>' +
             '<span style="font-size:8px;">' + (d.tipo === "guarderia" ? "🏫" : "🏠") + '</span>' +
@@ -646,14 +675,19 @@
           r.ninoText +
         '</div>' +
 
-        '<div style="margin-top:12px; font-size:12px;">' +
-          '<strong>🍐 Merienda (' + m.id + '):</strong><br>' +
-          '<span style="color:var(--text-muted);">' + m.nombre + ' (' + m.pNino + 'g prot niño)</span>' +
+        '<div style="margin-top:14px; padding:10px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px;">' +
+          '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+            '<span style="font-size:11px; font-weight:800; color:#166534;">🍐 Merienda Infantil (' + m.id + ')</span>' +
+            '<span style="font-size:10px; font-weight:700; color:#047857; background:#dcfce7; padding:2px 6px; border-radius:6px;">' + m.pNino + 'g prot</span>' +
+          '</div>' +
+          '<div style="font-weight:700; font-size:12px; margin-top:3px; color:#14532d;">' + m.nombre + '</div>' +
+          '<div style="font-size:11px; color:#166534; margin-top:4px;"><strong>Pauta segura:</strong> ' + m.ninoText + '</div>' +
+          '<button data-id="' + m.id + '" onclick="openRecipeFromEl(this)" class="btn btn-outline" style="margin-top:8px; width:100%; padding:5px 8px; font-size:11px; border-color:#86efac; color:#166534; background:white;">📖 Ver receta de la merienda</button>' +
         '</div>' +
 
         '<div style="display:flex; gap:8px; margin-top:14px;">' +
           '<button onclick="cambiarRecetaActual()" class="btn btn-outline" style="flex:1;">🔄 Cambiar plato</button>' +
-          '<button data-id="' + r.id + '" onclick="openRecipeFromEl(this)" class="btn btn-primary" style="flex:1;">📖 Ver receta</button>' +
+          '<button data-id="' + r.id + '" onclick="openRecipeFromEl(this)" class="btn btn-primary" style="flex:1;">📖 Receta comida</button>' +
         '</div>' +
       '</div>';
       el.innerHTML = html;
@@ -1122,9 +1156,33 @@
       var r = getRecipeById(id);
       if (!r) return;
       document.getElementById("modal-title").textContent = r.icon + " " + r.id + " · " + r.nombre;
+
+      var pasosHtml = "";
+      if (r.tipo === "merienda") {
+        pasosHtml = '<div style="font-size:12px;">' +
+          '<strong>🍐 Preparación Segura de la Merienda:</strong>' +
+          '<ol style="padding-left:18px; margin-top:6px; line-height:1.6;">' +
+            '<li>Lavar bien la fruta de temporada (' + r.ing + ') bajo agua corriente.</li>' +
+            '<li><strong>Corte antiasfixia (R23/R60):</strong> Cortar la fruta en láminas finas o en cuartos longitudinales (nunca en rodajas redondas enteras). Despepitar minuciosamente.</li>' +
+            '<li>Si incluye frutos secos o semillas, servirlos exclusivamente en <strong>harina fina molida o crema 100% untable</strong> sin trozos (Regla R22).</li>' +
+            '<li>Acompañar con yogur natural entero, kéfir suave o pan integral tierno sin sal ni azúcares añadidos (Regla R61).</li>' +
+          '</ol>' +
+        '</div>';
+      } else {
+        pasosHtml = '<div style="font-size:12px;">' +
+          '<strong>👩‍🍳 Elaboración Familiar (0% sal añadida en cocción):</strong>' +
+          '<ol style="padding-left:18px; margin-top:6px; line-height:1.6;">' +
+            '<li>Lavar y trocear la verdura de temporada (' + (r.hortaliza || 'huerta') + ', puerro y cebolla).</li>' +
+            '<li>Cocinar con Aceite de Oliva Virgen Extra (AOVE) y 0 g de sal añadida en olla/sartén familiar (Regla R24).</li>' +
+            '<li>Incorporar ' + r.ing + ' asegurando cocción completa (>75 °C en el centro, Regla R26).</li>' +
+            '<li>Separar la ración adaptada de 180 g del niño antes de salar en mesa el plato de los adultos.</li>' +
+          '</ol>' +
+        '</div>';
+      }
+
       document.getElementById("modal-body").innerHTML =
         '<div style="margin-bottom:10px; font-size:11px; color:var(--text-muted);">' +
-          'Ingrediente: <strong>' + r.ing + '</strong> · Base: <strong>' + r.hidrato + '</strong> · Tiempo: <strong>' + r.tiempo + ' min</strong>' +
+          'Categoría: <strong>' + (r.tipo === "merienda" ? "Merienda Infantil" : "Comida Principal") + '</strong> · Base: <strong>' + r.hidrato + '</strong> · Tiempo: <strong>' + r.tiempo + ' min</strong>' +
         '</div>' +
         '<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:12px; text-align:center;">' +
           '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px;">' +
@@ -1140,15 +1198,7 @@
         '<div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px; font-size:11px; color:#92400e; margin-bottom:12px;">' +
           '<strong>👶 Pauta de seguridad infantil (R23/R24):</strong><br>' + r.ninoText +
         '</div>' +
-        '<div style="font-size:12px;">' +
-          '<strong>👩‍🍳 Elaboración (0% sal añadida en cocción):</strong>' +
-          '<ol style="padding-left:18px; margin-top:6px;">' +
-            '<li>Lavar y trocear la verdura de temporada (' + (r.hortaliza || 'huerta') + ', puerro y cebolla).</li>' +
-            '<li>Cocinar con Aceite de Oliva Virgen Extra (AOVE) y 0 g de sal añadida (Regla R24).</li>' +
-            '<li>Incorporar ' + r.ing + ' asegurando cocción completa (>75 °C en centro, Regla R26).</li>' +
-            '<li>Separar la ración de 180 g del niño antes de salar en mesa el plato de los adultos.</li>' +
-          '</ol>' +
-        '</div>';
+        pasosHtml;
       document.getElementById("modal").style.display = "flex";
     }
 
