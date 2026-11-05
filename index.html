@@ -595,13 +595,13 @@
         function renderGuarderia(el) {
       var html = '<div class="card">' +
         '<h2 style="font-size:15px; font-weight:800;">🏫 Menú Guardería (Lector OCR)</h2>' +
-        '<p style="font-size:11px; color:var(--text-muted); margin:4px 0 10px 0;">Sube la foto del menú mensual desde tu galería para que el motor OCR lea los platos automáticamente.</p>' +
+        '<p style="font-size:11px; color:var(--text-muted); margin:4px 0 10px 0;">Sube a foto do menú dende a túa galería. O motor OCR recoñece textos en galego e castelán (peixe, legumes, carnes e nitratos R21).</p>' +
         '<label class="btn btn-primary" style="width:100%; cursor:pointer;">' +
           '📷 Seleccionar foto del menú escolar' +
           '<input type="file" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="procesarArchivo(event)">' +
         '</label>' +
         '<div id="ocr-status-box" style="display:none; margin-top:12px; padding:10px; border-radius:10px; background:#f0fdf4; border:1px solid #bbf7d0;">' +
-          '<div id="ocr-status-text" style="font-size:11px; font-weight:700; color:#166534; margin-bottom:6px;">Iniciando motor OCR...</div>' +
+          '<div id="ocr-status-text" style="font-size:11px; font-weight:700; color:#166534; margin-bottom:6px;">Iniciando motor OCR (Galego + Español)...</div>' +
           '<div style="background:#e2e8f0; border-radius:9999px; height:8px; overflow:hidden;">' +
             '<div id="ocr-progress-bar" style="background:var(--primary); height:100%; width:0%; transition:width 0.2s;"></div>' +
           '</div>' +
@@ -650,7 +650,7 @@
 
         if (statusText) statusText.textContent = "Iniciando análisis óptico de la imagen...";
         
-        var worker = await Tesseract.createWorker('spa', 1, {
+        var worker = await Tesseract.createWorker('glg+spa', 1, {
           logger: function(m) {
             if (m.status === 'recognizing text') {
               var pct = Math.round(m.progress * 100);
@@ -751,29 +751,89 @@
 
     function clasificarComida(txt) {
       var low = txt.toLowerCase();
-      var nitratos = (low.indexOf("espinaca") !== -1 || low.indexOf("acelga") !== -1);
+      // Regla R21: Control de nitratos (espinacas / acelgas en galego e castelán)
+      var nitratos = (
+        low.indexOf("espinaca") !== -1 || 
+        low.indexOf("acelga") !== -1 ||
+        low.indexOf("espinacas") !== -1 ||
+        low.indexOf("acelgas") !== -1
+      );
+
       var grupo = null;
       var ing = "mixto";
       var hidrato = "patata";
 
-      if (low.indexOf("lenteja") !== -1) { grupo = "legumbre"; ing = "lenteja"; hidrato = "legumbre"; }
-      else if (low.indexOf("garbanzo") !== -1) { grupo = "legumbre"; ing = "garbanzo"; hidrato = "legumbre"; }
-      else if (low.indexOf("alubia") !== -1 || low.indexOf("faba") !== -1 || low.indexOf("judía") !== -1) { grupo = "legumbre"; ing = "alubia"; hidrato = "legumbre"; }
-      else if (low.indexOf("merluza") !== -1) { grupo = "pescado_blanco"; ing = "merluza"; hidrato = "patata"; }
-      else if (low.indexOf("abadejo") !== -1) { grupo = "pescado_blanco"; ing = "abadejo"; hidrato = "patata"; }
-      else if (low.indexOf("bacalao") !== -1) { grupo = "pescado_blanco"; ing = "bacalao"; hidrato = "patata"; }
-      else if (low.indexOf("rape") !== -1) { grupo = "pescado_blanco"; ing = "rape"; hidrato = "patata"; }
-      else if (low.indexOf("pescadilla") !== -1 || low.indexOf("lirio") !== -1) { grupo = "pescado_blanco"; ing = "lirio"; hidrato = "patata"; }
-      else if (low.indexOf("sardina") !== -1) { grupo = "pescado_azul"; ing = "sardina"; hidrato = "patata"; }
-      else if (low.indexOf("xarda") !== -1 || low.indexOf("caballa") !== -1 || low.indexOf("verdel") !== -1) { grupo = "pescado_azul"; ing = "xarda"; hidrato = "arroz"; }
-      else if (low.indexOf("bonito") !== -1 || low.indexOf("atun") !== -1) { grupo = "pescado_azul"; ing = "bonito"; hidrato = "arroz"; }
-      else if (low.indexOf("salmón") !== -1 || low.indexOf("salmon") !== -1) { grupo = "pescado_azul"; ing = "salmón"; hidrato = "arroz"; }
-      else if (low.indexOf("pollo") !== -1) { grupo = "ave_conejo"; ing = "pollo"; hidrato = "arroz"; }
-      else if (low.indexOf("pavo") !== -1) { grupo = "ave_conejo"; ing = "pavo"; hidrato = "pasta"; }
-      else if (low.indexOf("conejo") !== -1) { grupo = "ave_conejo"; ing = "conejo"; hidrato = "patata"; }
-      else if (low.indexOf("ternera") !== -1) { grupo = "carne_roja"; ing = "ternera"; hidrato = "pasta"; }
-      else if (low.indexOf("cerdo") !== -1 || low.indexOf("magro") !== -1) { grupo = "carne_roja"; ing = "cerdo"; hidrato = "arroz"; }
-      else if (low.indexOf("tortilla") !== -1 || low.indexOf("huevo") !== -1 || low.indexOf("revuelto") !== -1) { grupo = "huevo"; ing = "huevo"; hidrato = "patata"; }
+      // 1. LEGUMES / LEGUMBRES
+      if (low.indexOf("lentell") !== -1 || low.indexOf("lentej") !== -1) {
+        grupo = "legumbre"; ing = "lenteja"; hidrato = "legumbre";
+      } else if (low.indexOf("garavanzo") !== -1 || low.indexOf("garbanzo") !== -1) {
+        grupo = "legumbre"; ing = "garbanzo"; hidrato = "legumbre";
+      } else if (low.indexOf("faba") !== -1 || low.indexOf("alubia") !== -1 || low.indexOf("feixón") !== -1 || low.indexOf("feixon") !== -1 || low.indexOf("xudía") !== -1 || low.indexOf("judía") !== -1) {
+        grupo = "legumbre"; ing = "alubia"; hidrato = "legumbre";
+      }
+      // 2. PEIXE BRANCO / PESCADO BLANCO
+      else if (low.indexOf("pescada") !== -1 || low.indexOf("merluza") !== -1) {
+        grupo = "pescado_blanco"; ing = "merluza"; hidrato = "patata";
+      } else if (low.indexOf("abadexo") !== -1 || low.indexOf("abadejo") !== -1) {
+        grupo = "pescado_blanco"; ing = "abadejo"; hidrato = "patata";
+      } else if (low.indexOf("bacallau") !== -1 || low.indexOf("bacalao") !== -1) {
+        grupo = "pescado_blanco"; ing = "bacalao"; hidrato = "patata";
+      } else if (low.indexOf("lirio") !== -1 || low.indexOf("bacaladilla") !== -1 || low.indexOf("pescadilla") !== -1) {
+        grupo = "pescado_blanco"; ing = "lirio"; hidrato = "patata";
+      } else if (low.indexOf("meiga") !== -1 || low.indexOf("gallo") !== -1) {
+        grupo = "pescado_blanco"; ing = "gallo"; hidrato = "patata";
+      } else if (low.indexOf("linguado") !== -1 || low.indexOf("lenguado") !== -1) {
+        grupo = "pescado_blanco"; ing = "lenguado"; hidrato = "patata";
+      } else if (low.indexOf("faneca") !== -1) {
+        grupo = "pescado_blanco"; ing = "faneca"; hidrato = "patata";
+      } else if (low.indexOf("peixe sapo") !== -1 || low.indexOf("tamorlán") !== -1 || low.indexOf("rape") !== -1) {
+        grupo = "pescado_blanco"; ing = "rape"; hidrato = "patata";
+      } else if (low.indexOf("robaliza") !== -1 || low.indexOf("lubina") !== -1 || low.indexOf("dourada") !== -1 || low.indexOf("dorada") !== -1) {
+        grupo = "pescado_blanco"; ing = "lubina"; hidrato = "patata";
+      }
+      // 3. PEIXE AZUL / PESCADO AZUL
+      else if (low.indexOf("xarda") !== -1 || low.indexOf("caballa") !== -1 || low.indexOf("verdel") !== -1) {
+        grupo = "pescado_azul"; ing = "xarda"; hidrato = "arroz";
+      } else if (low.indexOf("xurel") !== -1 || low.indexOf("chicharro") !== -1) {
+        grupo = "pescado_azul"; ing = "xurel"; hidrato = "patata";
+      } else if (low.indexOf("sardiña") !== -1 || low.indexOf("sardina") !== -1 || low.indexOf("xouba") !== -1) {
+        grupo = "pescado_azul"; ing = "sardina"; hidrato = "patata";
+      } else if (low.indexOf("bonito") !== -1 || low.indexOf("atún") !== -1 || low.indexOf("atun") !== -1) {
+        grupo = "pescado_azul"; ing = "bonito"; hidrato = "arroz";
+      } else if (low.indexOf("salmón") !== -1 || low.indexOf("salmon") !== -1) {
+        grupo = "pescado_azul"; ing = "salmón"; hidrato = "arroz";
+      }
+      // 4. MARISCOS E MOLUSCOS
+      else if (low.indexOf("mexillón") !== -1 || low.indexOf("mexillon") !== -1 || low.indexOf("mejillón") !== -1) {
+        grupo = "marisco_molusco"; ing = "mejillón"; hidrato = "arroz";
+      } else if (low.indexOf("choco") !== -1 || low.indexOf("lura") !== -1 || low.indexOf("calamar") !== -1 || low.indexOf("potas") !== -1) {
+        grupo = "marisco_molusco"; ing = "choco"; hidrato = "arroz";
+      } else if (low.indexOf("berberecho") !== -1 || low.indexOf("ameixa") !== -1 || low.indexOf("almeja") !== -1) {
+        grupo = "marisco_molusco"; ing = "berberecho"; hidrato = "patata";
+      }
+      // 5. AVES E COELLO
+      else if (low.indexOf("polo") !== -1 || low.indexOf("pitillo") !== -1 || low.indexOf("pollo") !== -1) {
+        grupo = "ave_conejo"; ing = "pollo"; hidrato = "arroz";
+      } else if (low.indexOf("pavo") !== -1 || low.indexOf("perú") !== -1) {
+        grupo = "ave_conejo"; ing = "pavo"; hidrato = "pasta";
+      } else if (low.indexOf("coello") !== -1 || low.indexOf("conejo") !== -1) {
+        grupo = "ave_conejo"; ing = "conejo"; hidrato = "patata";
+      }
+      // 6. CARNE VERMELLA / CARNE ROJA
+      else if (low.indexOf("tenreira") !== -1 || low.indexOf("ternera") !== -1 || low.indexOf("vaca") !== -1 || low.indexOf("bovino") !== -1) {
+        grupo = "carne_roja"; ing = "ternera"; hidrato = "patata";
+      } else if (low.indexOf("porco") !== -1 || low.indexOf("cerdo") !== -1 || low.indexOf("raxo") !== -1 || low.indexOf("zorza") !== -1) {
+        grupo = "carne_roja"; ing = "cerdo"; hidrato = "patata";
+      }
+      // 7. OVOS / HUEVOS
+      else if (low.indexOf("ovo") !== -1 || low.indexOf("huevo") !== -1 || low.indexOf("tortilla") !== -1 || low.indexOf("revolto") !== -1 || low.indexOf("revuelto") !== -1) {
+        grupo = "huevo"; ing = "huevo"; hidrato = "patata";
+      }
+
+      // Detección de base de hidratos acompañante
+      if (low.indexOf("arroz") !== -1) hidrato = "arroz";
+      else if (low.indexOf("pasta") !== -1 || low.indexOf("macarrón") !== -1 || low.indexOf("macarron") !== -1 || low.indexOf("fideos") !== -1 || low.indexOf("espaguete") !== -1) hidrato = "pasta";
+      else if (low.indexOf("pataca") !== -1 || low.indexOf("cachelo") !== -1 || low.indexOf("patata") !== -1) hidrato = "patata";
 
       var partes = txt.split(/[,\n\/\-]/);
       var primero = partes.length > 1 ? partes[0].trim() : "1º " + txt.substring(0, 30);
@@ -785,7 +845,7 @@
         hidrato: hidrato,
         primero: primero,
         segundo: segundo,
-        postre: "Fruta fresca",
+        postre: "Froita fresca de tempada",
         nitratos: nitratos,
         confianza: 80
       };
