@@ -212,15 +212,9 @@
 <body>
   <div id="app-container">
     <header>
-      <span class="badge">Pontevedra · Noviembre 2026</span>
-      <h1>Plan Familiar Atlántico</h1>
-      <p id="header-desc">Cargando base de datos de recetas...</p>
+      <h1>Plan Familiar Dieta Mediterránea</h1>
+      <p id="header-desc">Familia con 2 adultos y 1 bebé</p>
     </header>
-
-    <div id="r15-banner">
-      <span><strong>Aviso R15 (26 Nov):</strong> Lectura dudosa en el menú escolar.</span>
-      <button onclick="navTo('guarderia')">Confirmar</button>
-    </div>
 
     <main id="main-view">
       <div class="card">Conectando con recetas.json...</div>
@@ -513,7 +507,8 @@
       var ok = await cargarRecetas();
       var descEl = document.getElementById("header-desc");
       if (descEl) {
-        descEl.textContent = "2 Adultos + Niño 2a · " + ALL_RECIPES.length + " Recetas (recetas.json)";
+        // Subtítulo fijo
+        descEl.textContent = "Familia con 2 adultos y 1 bebé";
       }
 
       try {
@@ -537,8 +532,7 @@
           break;
         }
       }
-      var banner = document.getElementById("r15-banner");
-      if (banner) banner.style.display = pendingR15 ? "flex" : "none";
+// Alerta mostrada únicamente dentro del día
     }
 
     function navTo(tab) {
@@ -621,7 +615,7 @@
       navTo("dia");
     }
 
-    function renderDia(el) {
+        function renderDia(el) {
       var d = DB.plan[0];
       for (var i = 0; i < DB.plan.length; i++) {
         if (DB.plan[i].fecha === selectedDate) {
@@ -632,64 +626,98 @@
       var r = getRecipeById(d.comidaId);
       var m = getRecipeById(d.meriendaId);
 
-      var html = '<div class="card" style="display:flex; justify-content:space-between; align-items:center;">' +
+      // Totales de proteína acumulada del día (Comida + Merienda)
+      var prot80Tot = (r.p80 || 0) + (m.p80 || 0);
+      var prot60Tot = (r.p60 || 0) + (m.p60 || 0);
+      var protBSc = Math.round(((r.pNino || 0) + (m.pNino || 0)) * 10) / 10;
+
+      var html = '<div class="card" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">' +
         '<button class="btn btn-outline" style="padding:4px 10px;" onclick="changeDay(-1)">← Ant</button>' +
         '<div style="text-align:center;">' +
           '<div style="font-weight:800; font-size:14px;">' + d.fecha + '</div>' +
-          '<div style="font-size:11px; color:var(--text-muted);">' + (d.tipo === "guarderia" ? "Día de guardería (cena niño)" : "Comida familiar en casa") + '</div>' +
+          '<div style="font-size:11px; color:var(--text-muted);">' + (d.tipo === "guarderia" ? "Jornada escolar (Guardería + Cena)" : "Comida y cena familiar en casa") + '</div>' +
         '</div>' +
         '<button class="btn btn-outline" style="padding:4px 10px;" onclick="changeDay(1)">Sig →</button>' +
       '</div>';
 
+      // 1. MENÚ GUARDERÍA DEL BEBÉ
       if (d.gDay) {
-        html += '<div class="card" style="background:#f1f5f9; border-left:4px solid #0284c7;">' +
-          '<div style="font-size:11px; font-weight:700; color:#0369a1; text-transform:uppercase;">🏫 Menú Guardería (Mediodía niño)</div>' +
-          '<div style="font-size:12px; margin-top:4px;"><strong>1º:</strong> ' + d.gDay.primero + '</div>' +
-          '<div style="font-size:12px;"><strong>2º:</strong> ' + d.gDay.segundo + ' (' + d.gDay.grupo + ')</div>' +
-          (d.gDay.nitratos ? '<div style="font-size:10px; color:#047857; margin-top:4px; font-weight:700;">🥬 R21: Llevó espinacas/acelgas. Bloqueadas en la cena.</div>' : '') +
-          (!d.confirmado ? '<div style="margin-top:6px;"><button onclick="confirmarR15Actual()" class="btn btn-primary" style="padding:4px 8px; font-size:11px; background:#d97706;">Confirmar lectura dudosa</button></div>' : '') +
+        var g = d.gDay;
+        html += '<div class="card" style="border-left:4px solid #0284c7; background:#f0f9ff; padding:12px; margin-bottom:10px;">' +
+          '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">' +
+            '<span class="badge" style="background:#bae6fd; color:#0369a1;">🏫 Menú Guardería (Mediodía)</span>' +
+            (d.confirmado
+              ? '<span style="font-size:10px; font-weight:700; color:#0369a1;">Lectura OK</span>'
+              : '<span style="font-size:10px; font-weight:800; color:#b45309; background:#fef3c7; padding:2px 6px; border-radius:4px;">⚠️ Revisión R15</span>') +
+          '</div>' +
+          '<div style="font-size:13px; font-weight:800; color:#0f172a; margin-bottom:3px;">' + (g.segundo || "Segundo plato escolar") + '</div>' +
+          '<div style="font-size:11px; color:#475569; margin-bottom:4px;"><strong>1º prato:</strong> ' + (g.primero || "Sopa / Puré de verdura") + ' · <strong>Postre:</strong> ' + (g.postre || "Froita") + '</div>' +
+          (g.nitratos ? '<div style="font-size:10px; color:#047857; font-weight:700; margin-top:4px;">🥬 Regla R21: Tomó espinacas/acelgas a mediodía. Bloqueadas en la cena.</div>' : '') +
+          (!d.confirmado
+            ? '<div style="margin-top:8px; padding:6px 8px; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">' +
+                '<span style="font-size:10px; color:#92400e;">Lectura OCR dudosa</span>' +
+                '<button onclick="confirmarR15Actual()" class="btn btn-primary" style="padding:3px 8px; font-size:10px; background:#d97706;">Confirmar plato</button>' +
+              '</div>'
+            : '') +
         '</div>';
       }
 
-      html += '<div class="card">' +
-        '<span class="badge" style="background:#ecfdf5; color:#047857;">' + r.icon + ' ' + r.id + ' · ' + r.grupo + '</span>' +
-        '<h2 style="font-size:16px; font-weight:800; margin-top:6px;">' + r.nombre + '</h2>' +
-        
-        '<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin:12px 0; text-align:center;">' +
-          '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px;">' +
-            '<div style="font-size:10px; color:var(--text-muted);">Adulto 80kg</div>' +
-            '<div style="font-weight:800; font-size:13px; color:var(--primary);">' + r.p80 + 'g prot</div>' +
-          '</div>' +
-          '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px;">' +
-            '<div style="font-size:10px; color:var(--text-muted);">Adulto 60kg</div>' +
-            '<div style="font-weight:800; font-size:13px; color:var(--primary);">' + r.p60 + 'g prot</div>' +
-          '</div>' +
-          '<div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:6px;">' +
-            '<div style="font-size:10px; color:#047857;">Niño 2 años</div>' +
-            '<div style="font-weight:800; font-size:13px; color:#047857;">' + r.pNino + 'g prot</div>' +
-          '</div>' +
+      // 2. COMIDA PRINCIPAL (CENA / COMIDA CASA)
+      html += '<div class="card" style="border-left:4px solid var(--primary); padding:12px; margin-bottom:10px;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">' +
+          '<span class="badge" style="background:#ecfdf5; color:#047857;">🍲 ' + (d.tipo === "guarderia" ? "Cena Familiar" : "Comida Principal") + ' · ' + r.grupo.toUpperCase() + '</span>' +
+          '<span style="font-size:10px; color:var(--text-muted);">⏱️ ' + r.tiempo + ' min</span>' +
         '</div>' +
-
-        '<div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px; font-size:11px; color:#92400e;">' +
-          '<strong>👶 Emplatado Seguro Niño (R23 / R24):</strong><br>' +
-          r.ninoText +
+        '<h3 style="font-size:14px; font-weight:800; color:var(--text); margin-bottom:6px;">' + r.icon + ' ' + r.nombre + '</h3>' +
+        '<div style="background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px; font-size:11px; color:#92400e; margin-bottom:10px; line-height:1.4;">' +
+          '<strong>👶 Emplatado Seguro Bebé:</strong> ' + r.ninoText +
         '</div>' +
-
-        '<div style="margin-top:14px; padding:10px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px;">' +
-          '<div style="display:flex; justify-content:space-between; align-items:center;">' +
-            '<span style="font-size:11px; font-weight:800; color:#166534;">🍐 Merienda Infantil (' + m.id + ')</span>' +
-            '<span style="font-size:10px; font-weight:700; color:#047857; background:#dcfce7; padding:2px 6px; border-radius:6px;">' + m.pNino + 'g prot</span>' +
-          '</div>' +
-          '<div style="font-weight:700; font-size:12px; margin-top:3px; color:#14532d;">' + m.nombre + '</div>' +
-          '<div style="font-size:11px; color:#166534; margin-top:4px;"><strong>Pauta segura:</strong> ' + m.ninoText + '</div>' +
-          '<button data-id="' + m.id + '" onclick="openRecipeFromEl(this)" class="btn btn-outline" style="margin-top:8px; width:100%; padding:5px 8px; font-size:11px; border-color:#86efac; color:#166534; background:white;">📖 Ver receta de la merienda</button>' +
-        '</div>' +
-
-        '<div style="display:flex; gap:8px; margin-top:14px;">' +
-          '<button onclick="cambiarRecetaActual()" class="btn btn-outline" style="flex:1;">🔄 Cambiar plato</button>' +
-          '<button data-id="' + r.id + '" onclick="openRecipeFromEl(this)" class="btn btn-primary" style="flex:1;">📖 Receta comida</button>' +
+        '<div style="display:flex; gap:6px;">' +
+          '<button onclick="cambiarRecetaActual()" class="btn btn-outline" style="flex:1; padding:6px 8px; font-size:11px;">🔄 Cambiar comida</button>' +
+          '<button data-id="' + r.id + '" onclick="openRecipeFromEl(this)" class="btn btn-primary" style="flex:1; padding:6px 8px; font-size:11px;">📖 Receta</button>' +
         '</div>' +
       '</div>';
+
+      // 3. MERIENDA PROPUESTA (FORMATO SIMÉTRICO)
+      html += '<div class="card" style="border-left:4px solid #10b981; padding:12px; margin-bottom:12px;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">' +
+          '<span class="badge" style="background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0;">🍐 Merienda Infantil</span>' +
+          '<span style="font-size:10px; color:var(--text-muted);">⏱️ ' + m.tiempo + ' min</span>' +
+        '</div>' +
+        '<h3 style="font-size:14px; font-weight:800; color:var(--text); margin-bottom:6px;">' + m.icon + ' ' + m.nombre + '</h3>' +
+        '<div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:8px; font-size:11px; color:#166534; margin-bottom:10px; line-height:1.4;">' +
+          '<strong>👶 Emplatado Seguro Bebé:</strong> ' + m.ninoText +
+        '</div>' +
+        '<div style="display:flex; gap:6px;">' +
+          '<button onclick="cambiarMeriendaActual()" class="btn btn-outline" style="flex:1; padding:6px 8px; font-size:11px;">🔄 Cambiar merienda</button>' +
+          '<button data-id="' + m.id + '" onclick="openRecipeFromEl(this)" class="btn btn-primary" style="flex:1; padding:6px 8px; font-size:11px; background:#10b981;">📖 Receta</button>' +
+        '</div>' +
+      '</div>';
+
+      // 4. BLOQUE INFERIOR CON RECUENTO TOTAL DE PROTEÍNAS
+      html += '<div class="card" style="background:#f8fafc; border:1px solid #cbd5e1; padding:12px;">' +
+        '<div style="font-size:11px; font-weight:800; color:#334155; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">' +
+          '📊 Aporte Proteico Total (Comida + Merienda)' +
+        '</div>' +
+        '<div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; text-align:center;">' +
+          '<div style="background:white; border:1px solid var(--border); border-radius:8px; padding:6px;">' +
+            '<div style="font-size:10px; color:var(--text-muted);">Adulto 80kg</div>' +
+            '<div style="font-weight:800; font-size:14px; color:var(--primary);">' + prot80Tot + 'g</div>' +
+            '<div style="font-size:9px; color:var(--text-muted);">Meta: ~65-80g</div>' +
+          '</div>' +
+          '<div style="background:white; border:1px solid var(--border); border-radius:8px; padding:6px;">' +
+            '<div style="font-size:10px; color:var(--text-muted);">Adulto 60kg</div>' +
+            '<div style="font-weight:800; font-size:14px; color:var(--primary);">' + prot60Tot + 'g</div>' +
+            '<div style="font-size:9px; color:var(--text-muted);">Meta: ~50-60g</div>' +
+          '</div>' +
+          '<div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:6px;">' +
+            '<div style="font-size:10px; color:#047857; font-weight:700;">Bebé</div>' +
+            '<div style="font-weight:800; font-size:14px; color:#047857;">' + protBSc + 'g</div>' +
+            '<div style="font-size:9px; color:#047857;">EFSA: 10-15g/día</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
       el.innerHTML = html;
     }
 
@@ -702,6 +730,28 @@
         selectedDate = DB.plan[idx + delta].fecha;
         render();
       }
+    }
+
+        function cambiarMeriendaActual() {
+      var d = null;
+      for (var i = 0; i < DB.plan.length; i++) {
+        if (DB.plan[i].fecha === selectedDate) { d = DB.plan[i]; break; }
+      }
+      if (!d) return;
+
+      var meriendas = [];
+      for (var j = 0; j < ALL_RECIPES.length; j++) {
+        if (ALL_RECIPES[j].tipo === "merienda") meriendas.push(ALL_RECIPES[j]);
+      }
+      if (meriendas.length === 0) return;
+
+      var currentIdx = 0;
+      for (var k = 0; k < meriendas.length; k++) {
+        if (meriendas[k].id === d.meriendaId) { currentIdx = k; break; }
+      }
+      d.meriendaId = meriendas[(currentIdx + 1) % meriendas.length].id;
+      save();
+      render();
     }
 
     function cambiarRecetaActual() {
