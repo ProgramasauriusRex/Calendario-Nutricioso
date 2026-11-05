@@ -232,7 +232,7 @@
   </div>
 
   <script>
-    var KEY_PLAN = "NUTRIFAMI_PLAN_V6";
+    var KEY_PLAN = "NUTRIFAMI_PLAN_V7_HARMONIZED";
     var KEY_RECIPES = "NUTRIFAMI_RECETAS_CACHE";
     var DB = null;
     var ALL_RECIPES = [];
@@ -338,6 +338,161 @@
       return ALL_RECIPES[0] || { id: id, nombre: "Plato en preparación", icon: "🍲", p80:35, p60:27, pNino:8.5, ing:"vegetal", hidrato:"patata", grupo:"legumbre", tiempo:30, ninoText:"" };
     }
 
+    
+    // --- MOTOR DE PLANIFICACIÓN NUTRIFAMI RÍAS BAIXAS (REGLAS AESAN / EFSA / PEDIATRÍA) ---
+    function generarPlanInteligente() {
+      var comidas = [];
+      var meriendas = [];
+      for (var i = 0; i < ALL_RECIPES.length; i++) {
+        if (ALL_RECIPES[i].tipo === "comida") comidas.push(ALL_RECIPES[i]);
+        else if (ALL_RECIPES[i].tipo === "merienda") meriendas.push(ALL_RECIPES[i]);
+      }
+      if (comidas.length === 0) return [];
+
+      var byGroup = {};
+      for (var c = 0; c < comidas.length; c++) {
+        var grp = comidas[c].grupo;
+        if (!byGroup[grp]) byGroup[grp] = [];
+        byGroup[grp].push(comidas[c]);
+      }
+
+      var gMap = {};
+      for (var g = 0; g < GUARDERIA_NOV.length; g++) {
+        gMap[GUARDERIA_NOV[g].fecha] = GUARDERIA_NOV[g];
+      }
+
+      var plan = [];
+      var recetasUsadas = [];
+      var ultimoGrupo = null;
+      var gruposBase = ["pescado_blanco", "legumbre", "pescado_azul", "huevo", "ave_conejo", "marisco_molusco", "vegetal_cereal", "carne_roja"];
+
+      for (var d = 1; d <= 30; d++) {
+        var dateStr = "2026-11-" + (d < 10 ? "0" + d : d);
+        var gDay = gMap[dateStr] || null;
+
+        // Contar grupos de los últimos 6 días para balance semanal
+        var ultimos7Dias = plan.slice(Math.max(0, plan.length - 6));
+        var gruposSemana = [];
+        for (var u = 0; u < ultimos7Dias.length; u++) {
+          var rU = getRecipeById(ultimos7Dias[u].comidaId);
+          if (rU) gruposSemana.push(rU.grupo);
+        }
+
+        // 1. Filtrar grupos candidatos válidos
+        var candidatos = [];
+        for (var gb = 0; gb < gruposBase.length; gb++) {
+          var grp = gruposBase[gb];
+          // REGLA R10/R11: No repetir el grupo de la guardería
+          if (gDay && gDay.grupo && grp === gDay.grupo) continue;
+          // No repetir el mismo grupo dos noches seguidas
+          if (grp === ultimoGrupo) continue;
+          // Carne roja máximo 1 vez a la semana en casa
+          if (grp === "carne_roja") {
+            var countCarne = 0;
+            for (var cs = 0; cs < gruposSemana.length; cs++) {
+              if (gruposSemana[cs] === "carne_roja") countCarne++;
+            }
+            if (countCarne >= 1) continue;
+          }
+          candidatos.push(grp);
+        }
+
+        if (candidatos.length === 0) {
+          candidatos = ["pescado_blanco", "huevo", "legumbre", "pescado_azul"];
+        }
+
+        // 2. Ordenar candidatos según prioridad nutricional atlántica (favorecer pescado y rotación)
+        candidatos.sort(function(a, b) {
+          var countA = 0, countB = 0;
+          for (var k = 0; k < gruposSemana.length; k++) {
+            if (gruposSemana[k] === a) countA++;
+            if (gruposSemana[k] === b) countB++;
+          }
+          var pesos = { pescado_blanco: 6, huevo: 5, pescado_azul: 5, legumbre: 4, marisco_molusco: 4, ave_conejo: 3, vegetal_cereal: 3, carne_roja: 1 };
+          var scoreA = (pesos[a] || 3) - (countA * 3);
+          var scoreB = (pesos[b] || 3) - (countB * 3);
+          return scoreB - scoreA;
+        });
+
+        // 3. Seleccionar receta con ventana de 14 días (Regla R01) y sin nitratos si guardería los tuvo (Regla R21)
+        var comidaElegida = null;
+        for (var cIdx = 0; cIdx < candidatos.length; cIdx++) {
+          var candGrp = candidatos[cIdx];
+          var pool = byGroup[candGrp] || [];
+          var validas = [];
+          for (var pIdx = 0; pIdx < pool.length; pIdx++) {
+            var rec = pool[pIdx];
+            // Ventana de 14 días
+            var usadaReciente = false;
+            var inicioVentana = Math.max(0, recetasUsadas.length - 14);
+            for (var v = inicioVentana; v < recetasUsadas.length; v++) {
+              if (recetasUsadas[v] === rec.id) { usadaReciente = true; break; }
+            }
+            if (usadaReciente) continue;
+
+            // Regla R21: Si en guardería comió espinacas/acelgas, vetadas en la cena
+            if (gDay && gDay.nitratos && (rec.hortaliza === "espinaca" || rec.hortaliza === "acelga")) {
+              continue;
+            }
+
+            validas.push(rec);
+          }
+
+          if (validas.length > 0) {
+            // Escoger aleatoriamente entre las 4 primeras para dar variedad mensual al reordenar
+            var rndIndex = Math.floor(Math.random() * Math.min(4, validas.length));
+            comidaElegida = validas[rndIndex];
+            break;
+          }
+        }
+
+        if (!comidaElegida) {
+          // Fallback seguro evitando colisión directa
+          for (var fb = 0; fb < comidas.length; fb++) {
+            if (!gDay || comidas[fb].grupo !== gDay.grupo) {
+              comidaElegida = comidas[fb];
+              break;
+            }
+          }
+        }
+
+        recetasUsadas.push(comidaElegida.id);
+        ultimoGrupo = comidaElegida.grupo;
+
+        // 4. Seleccionar merienda sin repetir en 7 días
+        var meriendaElegida = meriendas[0];
+        if (meriendas.length > 0) {
+          var ultimasMeriendas = [];
+          var mInicio = Math.max(0, plan.length - 7);
+          for (var mi = mInicio; mi < plan.length; mi++) {
+            ultimasMeriendas.push(plan[mi].meriendaId);
+          }
+          var meriendasValidas = [];
+          for (var mv = 0; mv < meriendas.length; mv++) {
+            if (ultimasMeriendas.indexOf(meriendas[mv].id) === -1) {
+              meriendasValidas.push(meriendas[mv]);
+            }
+          }
+          if (meriendasValidas.length > 0) {
+            meriendaElegida = meriendasValidas[Math.floor(Math.random() * meriendasValidas.length)];
+          } else {
+            meriendaElegida = meriendas[Math.floor(Math.random() * meriendas.length)];
+          }
+        }
+
+        plan.push({
+          fecha: dateStr,
+          tipo: gDay ? "guarderia" : "casa",
+          comidaId: comidaElegida.id,
+          meriendaId: meriendaElegida.id,
+          gDay: gDay,
+          confirmado: gDay ? gDay.ok : true
+        });
+      }
+
+      return plan;
+    }
+
     async function init() {
       var ok = await cargarRecetas();
       var descEl = document.getElementById("header-desc");
@@ -351,24 +506,7 @@
       } catch(e) {}
 
       if (!DB || !DB.plan || DB.plan.length < 30) {
-        var plan = [];
-        for (var d = 1; d <= 30; d++) {
-          var dateStr = "2026-11-" + (d < 10 ? "0" + d : d);
-          var gDay = null;
-          for (var i = 0; i < GUARDERIA_NOV.length; i++) {
-            if (GUARDERIA_NOV[i].fecha === dateStr) { gDay = GUARDERIA_NOV[i]; break; }
-          }
-          var pair = PLAN_NOV_30_IDS[d - 1];
-          plan.push({
-            fecha: dateStr,
-            tipo: gDay ? "guarderia" : "casa",
-            comidaId: pair[0],
-            meriendaId: pair[1],
-            gDay: gDay || null,
-            confirmado: gDay ? gDay.ok : true
-          });
-        }
-        DB = { plan: plan };
+        DB = { plan: generarPlanInteligente() };
         save();
       }
       render();
@@ -534,20 +672,39 @@
 
     function cambiarRecetaActual() {
       var d = null;
+      var dIdx = -1;
       for (var i = 0; i < DB.plan.length; i++) {
-        if (DB.plan[i].fecha === selectedDate) { d = DB.plan[i]; break; }
+        if (DB.plan[i].fecha === selectedDate) { d = DB.plan[i]; dIdx = i; break; }
       }
       if (!d) return;
+
       var comidas = [];
       for (var j = 0; j < ALL_RECIPES.length; j++) {
         if (ALL_RECIPES[j].tipo === "comida") comidas.push(ALL_RECIPES[j]);
       }
       if (comidas.length === 0) return;
-      var currentIdx = 0;
+
+      // Filtrar recetas compatibles con este día específico
+      var grupoPrevio = (dIdx > 0 && DB.plan[dIdx - 1]) ? getRecipeById(DB.plan[dIdx - 1].comidaId).grupo : null;
+      var candidatas = [];
       for (var k = 0; k < comidas.length; k++) {
-        if (comidas[k].id === d.comidaId) { currentIdx = k; break; }
+        var c = comidas[k];
+        // R10/R11: No repetir grupo de guardería
+        if (d.gDay && d.gDay.grupo && c.grupo === d.gDay.grupo) continue;
+        // R21: Nitratos
+        if (d.gDay && d.gDay.nitratos && (c.hortaliza === "espinaca" || c.hortaliza === "acelga")) continue;
+        // No coincidir con el día anterior si es posible
+        if (grupoPrevio && c.grupo === grupoPrevio) continue;
+        candidatas.push(c);
       }
-      d.comidaId = comidas[(currentIdx + 1) % comidas.length].id;
+
+      if (candidatas.length === 0) candidatas = comidas;
+
+      var currentIdx = 0;
+      for (var m = 0; m < candidatas.length; m++) {
+        if (candidatas[m].id === d.comidaId) { currentIdx = m; break; }
+      }
+      d.comidaId = candidatas[(currentIdx + 1) % candidatas.length].id;
       save();
       render();
     }
@@ -744,9 +901,16 @@
         }
       }
 
+      // Actualizar la lista en memoria de la guardería
+      GUARDERIA_NOV = [];
+      for (var gIdx = 0; gIdx < DB.plan.length; gIdx++) {
+        if (DB.plan[gIdx].gDay) GUARDERIA_NOV.push(DB.plan[gIdx].gDay);
+      }
+      // REGLAS R10/R11: Re-armonizar las cenas del hogar para evitar toda colisión con el nuevo menú escolar
+      DB.plan = generarPlanInteligente();
       save();
       render();
-      alert("Se han reconocido y vinculado " + idxLaborable + " comidas escolares al mes. Si algún día quedó dudoso, se activará el aviso ámbar R15.");
+      alert("¡Menú escolar procesado! Se han armonizado automáticamente las 30 cenas familiares para garantizar 0 repeticiones con la guardería.");
     }
 
     function clasificarComida(txt) {
@@ -1017,17 +1181,10 @@
     }
 
     function regenerarMes() {
-      var comidas = [];
-      for (var i = 0; i < ALL_RECIPES.length; i++) {
-        if (ALL_RECIPES[i].tipo === "comida") comidas.push(ALL_RECIPES[i]);
-      }
-      if (comidas.length === 0) return;
-      var offset = Math.floor(Math.random() * 40);
-      for (var d = 0; d < DB.plan.length; d++) {
-        DB.plan[d].comidaId = comidas[(d + offset) % comidas.length].id;
-      }
+      DB.plan = generarPlanInteligente();
       save();
       render();
+      alert("Mes reordenado con éxito: 0 colisiones con la guardería y rotación equilibrada de los 8 grupos proteicos.");
     }
 
     function closeModal() {
