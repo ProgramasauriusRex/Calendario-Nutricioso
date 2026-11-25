@@ -243,7 +243,7 @@
 
   <script>
     var KEY_PLAN = "NUTRIFAMI_PLAN_V7_HARMONIZED";
-    var KEY_RECIPES = "NUTRIFAMI_RECETAS_CACHE";
+    var KEY_RECIPES = "NUTRIFAMI_RECETAS_CACHE_V2_DETAILED";
     var DB = null;
     var ALL_RECIPES = [];
     var currentTab = "mes";
@@ -1207,30 +1207,55 @@
       if (!r) return;
       document.getElementById("modal-title").textContent = r.icon + " " + r.id + " · " + r.nombre;
 
+      // Lista de ingredientes con cantidades exactas
+      var ingHtml = "";
+      if (Array.isArray(r.ingredientes) && r.ingredientes.length > 0) {
+        ingHtml = '<div style="margin-bottom:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">' +
+          '<div style="font-size:12px; font-weight:800; color:#0f172a; margin-bottom:6px;">🧾 Ingredientes y cantidades (' + (r.raciones || '2 adultos + 1 bebé') + '):</div>' +
+          '<ul style="padding-left:18px; margin:0; font-size:12px; line-height:1.55; color:#334155;">';
+        for (var i = 0; i < r.ingredientes.length; i++) {
+          ingHtml += '<li>' + r.ingredientes[i] + '</li>';
+        }
+        ingHtml += '</ul></div>';
+      }
+
+      // Elaboración paso a paso específica de la receta
       var pasosHtml = "";
-      if (r.tipo === "merienda") {
-        pasosHtml = '<div style="font-size:12px;">' +
-          '<strong>🍐 Preparación Segura de la Merienda:</strong>' +
-          '<ol style="padding-left:18px; margin-top:6px; line-height:1.6;">' +
-            '<li>Lavar bien la fruta de temporada (' + r.ing + ') bajo agua corriente.</li>' +
-            '<li><strong>Corte antiasfixia (R23/R60):</strong> Cortar la fruta en láminas finas o en cuartos longitudinales (nunca en rodajas redondas enteras). Despepitar minuciosamente.</li>' +
-            '<li>Si incluye frutos secos o semillas, servirlos exclusivamente en <strong>harina fina molida o crema 100% untable</strong> sin trozos (Regla R22).</li>' +
-            '<li>Acompañar con yogur natural entero, kéfir suave o pan integral tierno sin sal ni azúcares añadidos (Regla R61).</li>' +
-          '</ol>' +
-        '</div>';
+      if (Array.isArray(r.pasos) && r.pasos.length > 0) {
+        var tituloPasos = r.tipo === "merienda"
+          ? "🍐 Preparación Paso a Paso de la Merienda:"
+          : "👩‍🍳 Elaboración Paso a Paso (0 % sal añadida en cocción):";
+        pasosHtml = '<div style="font-size:12px; margin-bottom:12px;">' +
+          '<strong style="color:#0f172a;">' + tituloPasos + '</strong>' +
+          '<ol style="padding-left:18px; margin-top:6px; line-height:1.6; color:#1e293b;">';
+        for (var j = 0; j < r.pasos.length; j++) {
+          pasosHtml += '<li style="margin-bottom:4px;">' + r.pasos[j] + '</li>';
+        }
+        pasosHtml += '</ol></div>';
       } else {
-        pasosHtml = '<div style="font-size:12px;">' +
-          '<strong>👩‍🍳 Elaboración Familiar (0% sal añadida en cocción):</strong>' +
+        pasosHtml = '<div style="font-size:12px; margin-bottom:12px;">' +
+          '<strong>👩‍🍳 Elaboración:</strong>' +
           '<ol style="padding-left:18px; margin-top:6px; line-height:1.6;">' +
-            '<li>Lavar y trocear la verdura de temporada (' + (r.hortaliza || 'huerta') + ', puerro y cebolla).</li>' +
-            '<li>Cocinar con Aceite de Oliva Virgen Extra (AOVE) y 0 g de sal añadida en olla/sartén familiar (Regla R24).</li>' +
-            '<li>Incorporar ' + r.ing + ' asegurando cocción completa (>75 °C en el centro, Regla R26).</li>' +
-            '<li>Separar la ración adaptada de 180 g del niño antes de salar en mesa el plato de los adultos.</li>' +
-          '</ol>' +
+            '<li>Lavar y preparar la verdura o fruta (' + (r.hortaliza || r.ing) + ').</li>' +
+            '<li>Cocinar con AOVE y 0 g de sal añadida asegurando >75 °C en el centro.</li>' +
+            '<li>Separar la ración del bebé antes de salar en mesa los adultos.</li>' +
+          '</ol></div>';
+      }
+
+      // Consejos de preparación y conservación de los libros de referencia
+      var consejoHtml = "";
+      if (r.consejos) {
+        consejoHtml = '<div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:10px; font-size:11px; color:#166534; line-height:1.5;">' +
+          '<strong>💡 Consejos de preparación y conservación:</strong><br>' + r.consejos +
         '</div>';
       }
 
+      var fuenteBadge = r.fuente
+        ? '<div style="margin-bottom:8px;"><span style="display:inline-block; font-size:10px; font-weight:700; background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:9999px;">📚 Referencia: ' + r.fuente + '</span></div>'
+        : '';
+
       document.getElementById("modal-body").innerHTML =
+        fuenteBadge +
         '<div style="margin-bottom:10px; font-size:11px; color:var(--text-muted);">' +
           'Categoría: <strong>' + (r.tipo === "merienda" ? "Merienda Infantil" : "Comida Principal") + '</strong> · Base: <strong>' + r.hidrato + '</strong> · Tiempo: <strong>' + r.tiempo + ' min</strong>' +
         '</div>' +
@@ -1242,13 +1267,15 @@
             '<div style="font-size:10px;">Adulto 60kg</div><div style="font-weight:800; color:var(--primary);">' + r.p60 + 'g prot</div>' +
           '</div>' +
           '<div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:6px;">' +
-            '<div style="font-size:10px; color:#047857;">Niño 2 años</div><div style="font-weight:800; color:#047857;">' + r.pNino + 'g prot</div>' +
+            '<div style="font-size:10px; color:#047857;">Bebé</div><div style="font-weight:800; color:#047857;">' + r.pNino + 'g prot</div>' +
           '</div>' +
         '</div>' +
         '<div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px; font-size:11px; color:#92400e; margin-bottom:12px;">' +
           '<strong>👶 Pauta de seguridad infantil (R23/R24):</strong><br>' + r.ninoText +
         '</div>' +
-        pasosHtml;
+        ingHtml +
+        pasosHtml +
+        consejoHtml;
       document.getElementById("modal").style.display = "flex";
     }
 
